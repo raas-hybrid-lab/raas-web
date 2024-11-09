@@ -5,5 +5,4 @@
 // https://stackoverflow.com/questions/72114775/vite-global-is-not-defined
 
 // todo: i may be able to fix this by migrating to aws-sdk v3
-// @ts-ignore
 window.global ||= window;
