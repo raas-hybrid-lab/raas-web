@@ -1,5 +1,5 @@
-import AWS from 'aws-sdk';
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
+import { KinesisVideo, KinesisVideoSignalingChannels, KinesisVideoWebRTCStorage } from 'aws-sdk';
 
 class ChannelHelper {
     static IngestionMode = {
@@ -17,10 +17,10 @@ class ChannelHelper {
     private _clientId: string | undefined;
     private _channelArn?: string;
     private _endpoints?: Record<string, string>;
-    private _kinesisVideoClient?: AWS.KinesisVideo;
-    private _signalingChannelsClient?: AWS.KinesisVideoSignalingChannels;
+    private _kinesisVideoClient?: KinesisVideo;
+    private _signalingChannelsClient?: KinesisVideoSignalingChannels;
     private _signalingClient?: KVSWebRTC.SignalingClient;
-    private _webrtcStorageClient?: AWS.KinesisVideoWebRTCStorage;
+    private _webrtcStorageClient?: KinesisVideoWebRTCStorage;
     private _streamArn?: string;
     private _signalingConnectionStarted?: Date;
 
@@ -60,7 +60,7 @@ class ChannelHelper {
         return this._channelArn;
     }
 
-    getKinesisVideoClient(): AWS.KinesisVideo | undefined {
+    getKinesisVideoClient(): KinesisVideo | undefined {
         return this._kinesisVideoClient;
     }
 
@@ -72,7 +72,7 @@ class ChannelHelper {
         return this._ingestionMode === ChannelHelper.IngestionMode.ON;
     }
 
-    getWebRTCStorageClient(): AWS.KinesisVideoWebRTCStorage | undefined {
+    getWebRTCStorageClient(): KinesisVideoWebRTCStorage | undefined {
         return this._webrtcStorageClient;
     }
 
@@ -81,16 +81,26 @@ class ChannelHelper {
     }
 
     async fetchTurnServers(): Promise<RTCIceServer[]> {
-        const response = await this._signalingChannelsClient!.getIceServerConfig({ ChannelARN: this._channelArn! }).promise();
-        if (!response.IceServerList) {
+        if (!this._channelArn) {
+            throw new Error('Channel ARN is required to fetch TURN servers.');
+        }
+        const response = await this._signalingChannelsClient?.getIceServerConfig({ ChannelARN: this._channelArn }).promise();
+        if (!response?.IceServerList) {
             return [];
         }
         else {
-            return response.IceServerList.flatMap(iceServer => ({
-                urls: iceServer.Uris!,
-                username: iceServer.Username,
-                credential: iceServer.Password,
-            }));
+            return response.IceServerList.flatMap(iceServer => {
+                if (!iceServer.Uris) {
+                    // unsure why this would happen, but the typing indicates it might
+                    throw new Error('No Uris found in ice server config.');
+                }
+                const ret: RTCIceServer = {
+                    urls: iceServer.Uris,
+                    username: iceServer.Username,
+                    credential: iceServer.Password,
+                };
+                return [ret];
+            });
         }
     }
 
@@ -110,7 +120,7 @@ class ChannelHelper {
 
         this._endpoints = await this._getSignalingChannelEndpoints(this._kinesisVideoClient!, this._channelArn!, this._role, protocols);
 
-        this._signalingChannelsClient = new AWS.KinesisVideoSignalingChannels({
+        this._signalingChannelsClient = new KinesisVideoSignalingChannels({
             ...this._clientArgs,
             endpoint: this._endpoints['HTTPS'],
             correctClockSkew: true,
@@ -155,7 +165,7 @@ class ChannelHelper {
         });
 
         if (this._ingestionMode === ChannelHelper.IngestionMode.ON) {
-            this._webrtcStorageClient = new AWS.KinesisVideoWebRTCStorage({
+            this._webrtcStorageClient = new KinesisVideoWebRTCStorage({
                 ...this._clientArgs,
                 endpoint: this._endpoints['WEBRTC'],
             });
@@ -165,7 +175,7 @@ class ChannelHelper {
     private async _checkWebRTCIngestionPath(): Promise<void> {
         if (!this._kinesisVideoClient) {
 
-            this._kinesisVideoClient = new AWS.KinesisVideo({
+            this._kinesisVideoClient = new KinesisVideo({
                 ...this._clientArgs,
                 // @ts-expect-error this can actually be null (as in the example code in the sdk repo), it's just not documented
                 endpoint: this._endpoint,
@@ -202,7 +212,7 @@ class ChannelHelper {
         }
     }
 
-    private async _getSignalingChannelEndpoints(kinesisVideoClient: AWS.KinesisVideo, arn: string, role: string, protocols: string[]): Promise<Record<string, string>> {
+    private async _getSignalingChannelEndpoints(kinesisVideoClient: KinesisVideo, arn: string, role: string, protocols: string[]): Promise<Record<string, string>> {
         const getSignalingChannelEndpointResponse = await kinesisVideoClient
             .getSignalingChannelEndpoint({
                 ChannelARN: arn,

@@ -1,4 +1,4 @@
-import RTCBridgeMaster from './rtcBridgeMaster';
+import { RTCBridgeMaster } from '@raas-web/webrtc-bridge';
 
 // RobotsManager class
 class RobotsManager {
@@ -38,7 +38,7 @@ class RobotsManager {
             // this should never happen
             throw new Error("RTC bridge master not initialized.");
         }
-        await this.rtc!.startMaster();
+        await this.rtc?.startMaster();
     }
 
 }

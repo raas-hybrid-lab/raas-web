@@ -25,7 +25,7 @@ interface RTCBridgeMasterCallbacks {
     onSignalingError?: (error: Error) => void,
 }
 
-class RTCBridgeMaster {
+export class RTCBridgeMaster {
     /**
      * Singleton class for managing RTC connections with user clients.
      */
@@ -44,15 +44,16 @@ class RTCBridgeMaster {
     ) {
         this._callbacks = callbacks;
         this._clientConfig = {
-            accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-            secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-            sessionToken: import.meta.env.VITE_AWS_SESSION_TOKEN,
-            region: import.meta.env.VITE_KINESIS_REGION,
+            accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
+            secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
+            sessionToken: import.meta.env['VITE_AWS_SESSION_TOKEN'],
+            region: import.meta.env['VITE_KINESIS_REGION'],
         }
+        // console.log(`[MASTER]`, 'Client config:', this._clientConfig);
 
         this._peerConnections = new Map<string, RTCPeerConnection>();
 
-        const channelName = import.meta.env.VITE_KINESIS_CHANNEL_NAME;
+        const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
         this._channelHelper = new ChannelHelper(channelName, this._clientConfig, null, KVSWebRTC.Role.MASTER, ChannelHelper.IngestionMode.OFF, "[MASTER]", undefined);
     }
 
@@ -84,6 +85,7 @@ class RTCBridgeMaster {
             iceTransportPolicy: 'all',
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const signalingClient = this._channelHelper.getSignalingClient()!;
         await this._registerSignalingClientCallbacks(signalingClient, configuration);
 
