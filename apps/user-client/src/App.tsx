@@ -1,6 +1,5 @@
 import "./init";
-// import React from 'react';
-import { ThemeProvider, createTheme, CssBaseline, Container, Typography } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Container, Typography, Button } from '@mui/material';
 import RobotView from './components/RobotView';
 import './App.css';
 import { RTCBridgeViewer } from '@raas-web/webrtc-bridge';
@@ -12,9 +11,11 @@ const theme = createTheme({
 });
 
 function App() {
-
-  const rtcBridgeViewer = RTCBridgeViewer.getInstance({});
-  rtcBridgeViewer.then(viewer => viewer.startViewer());
+  const handleStartWebRTCViewer = async () => {
+    console.log('Starting WebRTC Viewer...');
+    const rtcBridgeViewer = await RTCBridgeViewer.getInstance({});
+    rtcBridgeViewer.startViewer();
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -23,7 +24,15 @@ function App() {
         <Typography variant="h3" component="h1" gutterBottom sx={{ mt: 4, mb: 2 }}>
           Robot Control Panel
         </Typography>
-        <RobotView />
+        <Button 
+          variant="contained" 
+          color="primary"
+          onClick={handleStartWebRTCViewer}
+          sx={{ mb: 2 }}
+        >
+          Start WebRTC Viewer
+        </Button>
+        {/* <RobotView /> */}
       </Container>
     </ThemeProvider>
   );
