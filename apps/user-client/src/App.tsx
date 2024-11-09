@@ -3,7 +3,7 @@ import "./init";
 import { ThemeProvider, createTheme, CssBaseline, Container, Typography } from '@mui/material';
 import RobotView from './components/RobotView';
 import './App.css';
-import RTCBridgeViewer from './services/rtcBridgeViewer';
+import { RTCBridgeViewer } from '@raas-web/webrtc-bridge';
 
 const theme = createTheme({
   palette: {

@@ -9,14 +9,8 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper from './channelHelper';
+import ChannelHelper, { AWSClientArgs } from './channelHelper';
 
-type AWSClientConfigType = {
-    accessKeyId: string;
-    secretAccessKey: string;
-    sessionToken: string;
-    region: string;
-};
 
 type RTCBridgeViewerCallbacks = {
     onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
@@ -24,7 +18,24 @@ type RTCBridgeViewerCallbacks = {
     onSignalingError?: (error: Error | object) => void,
 }
 
-class RTCBridgeViewer {
+// the sdk doesn't define this response type, so we need to define it ourselves.
+// Define the type for the status response
+type StatusResponseInner = {
+    correlationId: string;
+    errorType: string;
+    statusCode: string;
+    description: string;
+};
+
+// Define the main type
+type SignalingClientStatusResponse = {
+    senderClientId: string;
+    messageType: string;
+    messagePayload: string;
+    statusResponse: StatusResponseInner;
+};
+
+export class RTCBridgeViewer {
     /**
      * Singleton class for managing the RTC connection with the lab client.
      */
@@ -33,7 +44,7 @@ class RTCBridgeViewer {
 
     private _channelHelper: ChannelHelper;
     private readonly _callbacks: RTCBridgeViewerCallbacks
-    private readonly _clientConfig: AWSClientConfigType;
+    private readonly _clientConfig: AWSClientArgs;
 
     // peerConnection to the lab client
     private peerConnection: RTCPeerConnection | undefined;
@@ -43,14 +54,14 @@ class RTCBridgeViewer {
     ) {
         this._callbacks = callbacks;
         this._clientConfig = {
-            accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-            secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-            sessionToken: import.meta.env.VITE_AWS_SESSION_TOKEN,
-            region: import.meta.env.VITE_KINESIS_REGION,
+            accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
+            secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
+            sessionToken: import.meta.env['VITE_AWS_SESSION_TOKEN'],
+            region: import.meta.env['VITE_KINESIS_REGION'],
         }
 
-        let channelName = import.meta.env.VITE_KINESIS_CHANNEL_NAME;
-        let clientId = import.meta.env.VITE_KINESIS_CLIENT_ID;
+        const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
+        const clientId = import.meta.env['VITE_KINESIS_CLIENT_ID'];
         this._channelHelper = new ChannelHelper(
             channelName, 
             this._clientConfig, 
@@ -89,7 +100,7 @@ class RTCBridgeViewer {
             iceTransportPolicy: 'all',
         };
 
-        let signalingClient = this._channelHelper.getSignalingClient()!;
+        const signalingClient = this._channelHelper.getSignalingClient();
         await this._registerSignalingClientCallbacks(signalingClient, configuration);
 
         console.debug("Opening signaling client...");
@@ -112,8 +123,13 @@ class RTCBridgeViewer {
                 offerToReceiveVideo: true,
             });
             await this.peerConnection.setLocalDescription(offer);
-            // @ts-ignore
-            signalingClient.sendSdpOffer(this.peerConnection.localDescription);
+            if (this.peerConnection.localDescription) {
+                signalingClient.sendSdpOffer(this.peerConnection.localDescription);
+            }
+            else {
+                // unsure why this would happen, but typing indicates it's possible
+                throw new Error("No local description to send to lab client.");
+            }
 
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
@@ -146,13 +162,13 @@ class RTCBridgeViewer {
             }
         });
 
-        signalingClient.on('error', (error: any) => {
+        signalingClient.on('error', (error: Error) => {
             // Handle client errors
             console.error("Signaling client error...", error);
             this._callbacks.onSignalingError?.(error);
         });
 
-        signalingClient.on('statusResponse', (status: any) => {
+        signalingClient.on('statusResponse', (status: SignalingClientStatusResponse) => {
             // according to the docs, this only happens on errors. They don't specify more.
             // we'll see if it ever shows up.
             console.debug("Signaling client status response...", status);
