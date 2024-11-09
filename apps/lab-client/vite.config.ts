@@ -28,4 +28,10 @@ export default defineConfig({
       transformMixedEsModules: true,
     },
   },
+  define: {
+    // had to add this to make the kinesis webrtc sdk work with vite.
+    // see this github issue: 
+    // https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js/issues/321
+    'process.env.PACKAGE_VERSION': JSON.stringify("2.2.1"),
+  }
 });
