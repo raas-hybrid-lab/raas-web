@@ -9,15 +9,8 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper from './channelHelper';
+import ChannelHelper, { AWSClientArgs } from './channelHelper';
 
-
-interface AWSClientConfigType {
-    accessKeyId: string;
-    secretAccessKey: string;
-    sessionToken: string;
-    region: string;
-}
 
 interface RTCBridgeMasterCallbacks {
     onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
@@ -34,7 +27,7 @@ export class RTCBridgeMaster {
 
     private _channelHelper: ChannelHelper;
     private readonly _callbacks: RTCBridgeMasterCallbacks
-    private readonly _clientConfig: AWSClientConfigType;
+    private readonly _clientConfig: AWSClientArgs;
 
     // Map of clientId to peerConnection
     private _peerConnections: Map<string, RTCPeerConnection>;

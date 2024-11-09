@@ -1,6 +1,14 @@
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { KinesisVideo, KinesisVideoSignalingChannels, KinesisVideoWebRTCStorage } from 'aws-sdk';
 
+
+export type AWSClientArgs = {
+    region: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken?: string;
+}
+
 class ChannelHelper {
     static IngestionMode = {
         OFF: 0,
@@ -9,7 +17,7 @@ class ChannelHelper {
     };
 
     private _channelName: string;
-    private _clientArgs: AWS.KinesisVideo.ClientConfiguration;
+    private _clientArgs: AWSClientArgs;
     private _role: KVSWebRTC.Role;
     private _endpoint: string | null;
     private _ingestionMode: number;
@@ -24,7 +32,7 @@ class ChannelHelper {
     private _streamArn?: string;
     private _signalingConnectionStarted?: Date;
 
-    constructor(channelName: string, clientArgs: AWS.KinesisVideo.ClientConfiguration, endpoint: string | null, role: KVSWebRTC.Role, ingestionMode: number, loggingPrefix: string, clientId: string | undefined) {
+    constructor(channelName: string, clientArgs: AWSClientArgs, endpoint: string | null, role: KVSWebRTC.Role, ingestionMode: number, loggingPrefix: string, clientId: string | undefined) {
         this._channelName = channelName;
         this._clientArgs = clientArgs;
         this._role = role;
@@ -56,15 +64,24 @@ class ChannelHelper {
         await this._checkWebRTCIngestionPath();
     }
 
-    getChannelArn(): string | undefined {
+    getChannelArn(): string {
+        if (!this._channelArn) {
+            throw new Error('Channel ARN is not initialized- did you forget to call init()?');
+        }
         return this._channelArn;
     }
 
-    getKinesisVideoClient(): KinesisVideo | undefined {
+    getKinesisVideoClient(): KinesisVideo {
+        if (!this._kinesisVideoClient) {
+            throw new Error('Kinesis Video client is not initialized- did you forget to call init()?');
+        }
         return this._kinesisVideoClient;
     }
 
-    getSignalingClient(): KVSWebRTC.SignalingClient | undefined {
+    getSignalingClient(): KVSWebRTC.SignalingClient {
+        if (!this._signalingClient) {
+            throw new Error('Signaling client is not initialized- did you forget to call init()?');
+        }
         return this._signalingClient;
     }
 
@@ -72,11 +89,17 @@ class ChannelHelper {
         return this._ingestionMode === ChannelHelper.IngestionMode.ON;
     }
 
-    getWebRTCStorageClient(): KinesisVideoWebRTCStorage | undefined {
+    getWebRTCStorageClient(): KinesisVideoWebRTCStorage {
+        if (!this._webrtcStorageClient) {
+            throw new Error('WebRTC storage client is not initialized- did you forget to call init()?');
+        }
         return this._webrtcStorageClient;
     }
 
-    getStreamArn(): string | undefined {
+    getStreamArn(): string {
+        if (!this._streamArn) {
+            throw new Error('Stream ARN is not initialized- did you forget to call init()?');
+        }
         return this._streamArn;
     }
 
@@ -118,7 +141,7 @@ class ChannelHelper {
             protocols.push('WEBRTC');
         }
 
-        this._endpoints = await this._getSignalingChannelEndpoints(this._kinesisVideoClient!, this._channelArn!, this._role, protocols);
+        this._endpoints = await this._getSignalingChannelEndpoints(this.getKinesisVideoClient(), this.getChannelArn(), this._role, protocols);
 
         this._signalingChannelsClient = new KinesisVideoSignalingChannels({
             ...this._clientArgs,
@@ -127,22 +150,22 @@ class ChannelHelper {
         });
 
         this._signalingClient = new KVSWebRTC.SignalingClient({
-            channelARN: this._channelArn!,
+            channelARN: this.getChannelArn(),
             channelEndpoint: this._endpoints['WSS'],
             role: this._role,
-            region: this._clientArgs.region!,
+            region: this._clientArgs.region,
             credentials: {
-                accessKeyId: this._clientArgs.accessKeyId!,
-                secretAccessKey: this._clientArgs.secretAccessKey!,
-                sessionToken: this._clientArgs.sessionToken!,
+                accessKeyId: this._clientArgs.accessKeyId,
+                secretAccessKey: this._clientArgs.secretAccessKey,
+                sessionToken: this._clientArgs.sessionToken,
             },
             clientId: this._clientId,
             requestSigner: {
                 getSignedURL: async (signalingEndpoint: string, queryParams: KVSWebRTC.QueryParams, date: Date | undefined) => {
-                    const signer = new KVSWebRTC.SigV4RequestSigner(this._clientArgs.region!, {
-                        accessKeyId: this._clientArgs.accessKeyId!,
-                        secretAccessKey: this._clientArgs.secretAccessKey!,
-                        sessionToken: this._clientArgs.sessionToken!,
+                    const signer = new KVSWebRTC.SigV4RequestSigner(this._clientArgs.region, {
+                        accessKeyId: this._clientArgs.accessKeyId,
+                        secretAccessKey: this._clientArgs.secretAccessKey,
+                        sessionToken: this._clientArgs.sessionToken,
                     });
 
                     const signingStart = new Date();
@@ -161,7 +184,7 @@ class ChannelHelper {
                     return retVal;
                 },
             },
-            systemClockOffset: this._kinesisVideoClient!.config.systemClockOffset,
+            systemClockOffset: this.getKinesisVideoClient().config.systemClockOffset,
         });
 
         if (this._ingestionMode === ChannelHelper.IngestionMode.ON) {
@@ -191,21 +214,21 @@ class ChannelHelper {
                 })
                 .promise();
 
-            this._channelArn = describeSignalingChannelResponse.ChannelInfo!.ChannelARN;
+            this._channelArn = describeSignalingChannelResponse.ChannelInfo?.ChannelARN;
             console.log(this._loggingPrefix, 'Channel ARN:', this._channelArn);
         }
 
         if (this._ingestionMode === ChannelHelper.IngestionMode.DETERMINE_THROUGH_DESCRIBE) {
             const describeMediaStorageConfigurationResponse = await this._kinesisVideoClient
                 .describeMediaStorageConfiguration({
-                    ChannelARN: this._channelArn!,
+                    ChannelARN: this.getChannelArn(),
                 })
                 .promise();
             const mediaStorageConfiguration = describeMediaStorageConfigurationResponse.MediaStorageConfiguration;
             console.log(this._loggingPrefix, 'Media storage configuration:', mediaStorageConfiguration);
-            if (mediaStorageConfiguration!.Status === 'ENABLED' && mediaStorageConfiguration!.StreamARN !== null) {
+            if (mediaStorageConfiguration?.Status === 'ENABLED' && mediaStorageConfiguration?.StreamARN !== null) {
                 this._ingestionMode = ChannelHelper.IngestionMode.ON;
-                this._streamArn = mediaStorageConfiguration!.StreamARN;
+                this._streamArn = mediaStorageConfiguration?.StreamARN;
             } else {
                 this._ingestionMode = ChannelHelper.IngestionMode.OFF;
             }
@@ -222,9 +245,17 @@ class ChannelHelper {
                 },
             })
             .promise();
-        const endpointsByProtocol = getSignalingChannelEndpointResponse.ResourceEndpointList!.reduce((endpoints, endpoint) => {
-            endpoints[endpoint.Protocol!] = endpoint.ResourceEndpoint!;
-            return endpoints;
+        if (!getSignalingChannelEndpointResponse.ResourceEndpointList) {
+            throw new Error('No resource endpoint list found in get signaling channel endpoint response');
+        }
+        const endpointsByProtocol = getSignalingChannelEndpointResponse.ResourceEndpointList.reduce((endpoints, endpoint) => {
+            if (!endpoint.Protocol || !endpoint.ResourceEndpoint) {
+                return endpoints;
+            }
+            else {
+                endpoints[endpoint.Protocol] = endpoint.ResourceEndpoint;
+                return endpoints;
+            }
         }, {} as Record<string, string>);
         console.log(this._loggingPrefix, 'Endpoints:', endpointsByProtocol);
         return endpointsByProtocol;
