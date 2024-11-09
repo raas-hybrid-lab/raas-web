@@ -1,0 +1,29 @@
+.terminalBackground {
+  background-color: black;
+  color: white;
+  height: 300px; /* Adjust as needed */
+  overflow-y: auto;
+}
+
+.terminalBackground::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminalBackground::-webkit-scrollbar-track {
+  background: #333;
+}
+
+.terminalBackground::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+.terminalBackground::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* For Firefox */
+.terminalBackground {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #333;
+}

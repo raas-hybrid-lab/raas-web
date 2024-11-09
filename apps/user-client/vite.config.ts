@@ -6,7 +6,7 @@ import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 
 export default defineConfig({
   root: __dirname,
-  cacheDir: '../../node_modules/.vite/apps/user-client',
+  cacheDir: '../../node_modules/.vite/apps/lab-client',
   server: {
     port: 4200,
     host: 'localhost',
@@ -21,22 +21,17 @@ export default defineConfig({
   //  plugins: [ nxViteTsPaths() ],
   // },
   build: {
-    outDir: '../../dist/apps/user-client',
+    outDir: '../../dist/apps/lab-client',
     emptyOutDir: true,
     reportCompressedSize: true,
     commonjsOptions: {
       transformMixedEsModules: true,
     },
   },
-  test: {
-    watch: false,
-    globals: true,
-    environment: 'jsdom',
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/apps/user-client',
-      provider: 'v8',
-    },
-  },
+  define: {
+    // had to add this to make the kinesis webrtc sdk work with vite.
+    // see this github issue: 
+    // https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-js/issues/321
+    'process.env.PACKAGE_VERSION': JSON.stringify("2.2.1"),
+  }
 });
