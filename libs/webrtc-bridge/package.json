@@ -1,7 +1,10 @@
 {
   "name": "@raas-web/webrtc-bridge",
   "version": "0.0.1",
-  "dependencies": {},
+  "dependencies": {
+    "amazon-kinesis-video-streams-webrtc": "^2.3.1",
+    "aws-sdk": "^2.1691.0"
+  },
   "main": "./index.js",
   "module": "./index.mjs",
   "typings": "./index.d.ts",

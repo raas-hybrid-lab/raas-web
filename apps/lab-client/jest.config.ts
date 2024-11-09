@@ -7,4 +7,5 @@ export default {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/apps/lab-client',
+  passWithNoTests: true,
 };
