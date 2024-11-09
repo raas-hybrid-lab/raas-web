@@ -9,7 +9,8 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper, { AWSClientArgs } from './channelHelper';
+import ChannelHelper from './channelHelper';
+import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
 
 
 type RTCBridgeViewerCallbacks = {
@@ -53,12 +54,7 @@ export class RTCBridgeViewer {
         callbacks: RTCBridgeViewerCallbacks,
     ) {
         this._callbacks = callbacks;
-        this._clientConfig = {
-            accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
-            secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
-            sessionToken: import.meta.env['VITE_AWS_SESSION_TOKEN'],
-            region: import.meta.env['VITE_KINESIS_REGION'],
-        }
+        this._clientConfig = loadAWSClientArgs();
 
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
         const clientId = import.meta.env['VITE_KINESIS_CLIENT_ID'];

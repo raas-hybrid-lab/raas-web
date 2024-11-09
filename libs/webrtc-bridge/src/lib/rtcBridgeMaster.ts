@@ -9,8 +9,8 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper, { AWSClientArgs } from './channelHelper';
-
+import ChannelHelper from './channelHelper';
+import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
 
 interface RTCBridgeMasterCallbacks {
     onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
@@ -36,13 +36,7 @@ export class RTCBridgeMaster {
         callbacks: RTCBridgeMasterCallbacks,
     ) {
         this._callbacks = callbacks;
-        this._clientConfig = {
-            accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
-            secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
-            sessionToken: import.meta.env['VITE_AWS_SESSION_TOKEN'],
-            region: import.meta.env['VITE_KINESIS_REGION'],
-        }
-        // console.log(`[MASTER]`, 'Client config:', this._clientConfig);
+        this._clientConfig = loadAWSClientArgs();
 
         this._peerConnections = new Map<string, RTCPeerConnection>();
 
