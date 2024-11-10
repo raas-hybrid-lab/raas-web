@@ -14,7 +14,7 @@ function App() {
   const handleStartWebRTCViewer = async () => {
     console.log('Starting WebRTC Viewer...');
     const rtcBridgeViewer = await RTCBridgeViewer.getInstance({});
-    rtcBridgeViewer.startViewer();
+    rtcBridgeViewer.start();
   }
 
   return (

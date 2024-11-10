@@ -9,8 +9,7 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper from './channelHelper';
-import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
+import { RTCBridgeBase } from './rtcBridgeBase';
 
 
 type RTCBridgeViewerCallbacks = {
@@ -36,37 +35,28 @@ type SignalingClientStatusResponse = {
     statusResponse: StatusResponseInner;
 };
 
-export class RTCBridgeViewer {
+export class RTCBridgeViewer extends RTCBridgeBase {
     /**
      * Singleton class for managing the RTC connection with the lab client.
      */
 
     private static singleton: RTCBridgeViewer | undefined;
-
-    private _channelHelper: ChannelHelper;
     private readonly _callbacks: RTCBridgeViewerCallbacks
-    private readonly _clientConfig: AWSClientArgs;
-
-    // peerConnection to the lab client
     private peerConnection: RTCPeerConnection | undefined;
 
     private constructor(
         callbacks: RTCBridgeViewerCallbacks,
     ) {
-        this._callbacks = callbacks;
-        this._clientConfig = loadAWSClientArgs();
-
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
         const clientId = import.meta.env['VITE_KINESIS_CLIENT_ID'];
-        this._channelHelper = new ChannelHelper(
-            channelName, 
-            this._clientConfig, 
-            null, 
-            KVSWebRTC.Role.VIEWER, 
-            ChannelHelper.IngestionMode.OFF, 
-            "[VIEWER]", 
+
+        super(
+            channelName,
+            KVSWebRTC.Role.VIEWER,
+            "[VIEWER]",
             clientId
         );
+        this._callbacks = callbacks;
         this.peerConnection = undefined;
     }
 
@@ -77,34 +67,12 @@ export class RTCBridgeViewer {
         return this.singleton;
     }
 
-    cleanup(): void {
-        this._channelHelper.getSignalingClient()?.close();
+    override cleanup(): void {
         this._callbacks.onSignalingDisconnect?.();
+        super.cleanup();
     }
 
-
-    async startViewer(): Promise<void> {
-        await this._channelHelper?.init();
-        const iceServers: RTCIceServer[] = [];
-        // add STUN and TURN servers
-        iceServers.push({urls: `stun:stun.kinesisvideo.${this._clientConfig.region}.amazonaws.com:443`});
-        iceServers.push(...(await this._channelHelper.fetchTurnServers()));
-        console.log(`[VIEWER]`, 'ICE servers:', iceServers);
-
-        const configuration: RTCConfiguration = {
-            iceServers,
-            iceTransportPolicy: 'all',
-        };
-
-        const signalingClient = this._channelHelper.getSignalingClient();
-        await this._registerSignalingClientCallbacks(signalingClient, configuration);
-
-        console.debug("Opening signaling client...");
-        signalingClient.open();
-    }
-
-
-    private async _registerSignalingClientCallbacks(
+    protected override async _registerSignalingClientCallbacks(
         signalingClient: KVSWebRTC.SignalingClient,
         rtcConfig: RTCConfiguration,
     ): Promise<void> {

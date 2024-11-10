@@ -15,6 +15,11 @@ export type AWSClientArgs = {
  * @returns AWSClientArgs
  */
 export function loadAWSClientArgs(): AWSClientArgs {
+    const envType = import.meta.env['VITE_ENV'];
+    if (envType !== 'development') {
+        throw new Error('AWS client args can only be loaded in local development environment.');
+    }
+
     const args: AWSClientArgs = {
         accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
         secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
@@ -25,6 +30,8 @@ export function loadAWSClientArgs(): AWSClientArgs {
     if (sessionToken) {
         args.sessionToken = sessionToken;
     }
+
+    console.debug('Loaded AWS client args:', args);
 
     return args;
 }

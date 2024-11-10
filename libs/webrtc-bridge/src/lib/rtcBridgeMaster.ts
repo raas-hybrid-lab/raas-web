@@ -9,8 +9,7 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper from './channelHelper';
-import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
+import { RTCBridgeBase } from './rtcBridgeBase';
 
 interface RTCBridgeMasterCallbacks {
     onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
@@ -18,16 +17,13 @@ interface RTCBridgeMasterCallbacks {
     onSignalingError?: (error: Error) => void,
 }
 
-export class RTCBridgeMaster {
+export class RTCBridgeMaster extends RTCBridgeBase {
     /**
      * Singleton class for managing RTC connections with user clients.
      */
 
     private static singleton: RTCBridgeMaster | undefined;
-
-    private _channelHelper: ChannelHelper;
     private readonly _callbacks: RTCBridgeMasterCallbacks
-    private readonly _clientConfig: AWSClientArgs;
 
     // Map of clientId to peerConnection
     private _peerConnections: Map<string, RTCPeerConnection>;
@@ -35,13 +31,15 @@ export class RTCBridgeMaster {
     private constructor(
         callbacks: RTCBridgeMasterCallbacks,
     ) {
-        this._callbacks = callbacks;
-        this._clientConfig = loadAWSClientArgs();
-
-        this._peerConnections = new Map<string, RTCPeerConnection>();
-
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        this._channelHelper = new ChannelHelper(channelName, this._clientConfig, null, KVSWebRTC.Role.MASTER, ChannelHelper.IngestionMode.OFF, "[MASTER]", undefined);
+        super(
+            channelName,
+            KVSWebRTC.Role.MASTER,
+            "[MASTER]",
+            undefined
+        );
+        this._callbacks = callbacks;
+        this._peerConnections = new Map<string, RTCPeerConnection>();
     }
 
     public static async getInstance(callbacks: RTCBridgeMasterCallbacks): Promise<RTCBridgeMaster> {
@@ -51,36 +49,15 @@ export class RTCBridgeMaster {
         return this.singleton;
     }
 
-    cleanup(): void {
-        this._channelHelper?.getSignalingClient()?.close();
+    override cleanup(): void {
+        super.cleanup();
         this._peerConnections.forEach(peerConnection => peerConnection.close());
         this._peerConnections.clear();
         this._callbacks.onSignalingDisconnect?.();
         RTCBridgeMaster.singleton = undefined;
     }
 
-    async startMaster(): Promise<void> {
-        await this._channelHelper?.init();
-        const iceServers: RTCIceServer[] = [];
-        // add STUN and TURN servers
-        iceServers.push({urls: `stun:stun.kinesisvideo.${this._clientConfig.region}.amazonaws.com:443`});
-        iceServers.push(...(await this._channelHelper.fetchTurnServers()));
-        console.log(`[MASTER]`, 'ICE servers:', iceServers);
-
-        const configuration: RTCConfiguration = {
-            iceServers,
-            iceTransportPolicy: 'all',
-        };
-
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const signalingClient = this._channelHelper.getSignalingClient()!;
-        await this._registerSignalingClientCallbacks(signalingClient, configuration);
-
-        console.debug("Opening signaling client...");
-        signalingClient.open();
-    }
-
-    private async _registerSignalingClientCallbacks(
+    protected override async _registerSignalingClientCallbacks(
         signalingClient: KVSWebRTC.SignalingClient,
         rtcConfig: RTCConfiguration,
     ): Promise<void> {
