@@ -10,10 +10,12 @@ export abstract class RTCBridgeBase {
     protected _channelHelper: ChannelHelper;
     protected readonly _clientConfig: AWSClientArgs;
     protected readonly _loggingPrefix: string;
+    protected _isRunning: boolean;
 
     protected constructor(channelName: string, role: KVSWebRTC.Role, loggingPrefix: string, clientId: string | undefined) {
         this._clientConfig = loadAWSClientArgs();
         this._loggingPrefix = loggingPrefix;
+        this._isRunning = false;
 
         this._channelHelper = new ChannelHelper(channelName, this._clientConfig, null, role, ChannelHelper.IngestionMode.OFF, loggingPrefix, clientId);
     }
@@ -42,6 +44,11 @@ export abstract class RTCBridgeBase {
 
         console.debug(this._loggingPrefix, "Opening signaling client...");
         signalingClient.open();
+        this._isRunning = true;
+    }
+
+    public isRunning(): boolean {
+        return this._isRunning;
     }
 
     /**

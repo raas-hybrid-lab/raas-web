@@ -12,7 +12,7 @@ import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { RTCBridgeBase } from './rtcBridgeBase';
 
 
-type RTCBridgeViewerCallbacks = {
+export type RTCBridgeViewerCallbacks = {
     onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error | object) => void,
@@ -41,14 +41,15 @@ export class RTCBridgeViewer extends RTCBridgeBase {
      */
 
     private static singleton: RTCBridgeViewer | undefined;
-    private readonly _callbacks: RTCBridgeViewerCallbacks
+    private _callbacks: RTCBridgeViewerCallbacks
     private peerConnection: RTCPeerConnection | undefined;
 
     private constructor(
         callbacks: RTCBridgeViewerCallbacks,
     ) {
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        const clientId = import.meta.env['VITE_KINESIS_CLIENT_ID'];
+        // hardcoded for now--not sure if we need to make this dynamic
+        const clientId = "raas-viewer";
 
         super(
             channelName,
@@ -64,12 +65,17 @@ export class RTCBridgeViewer extends RTCBridgeBase {
         if (!this.singleton) {
             this.singleton = new RTCBridgeViewer(callbacks);
         }
+        else {
+            console.warn("RTCBridgeViewer singleton already exists. Returning existing instance & setting new callbacks.");
+            this.singleton._callbacks = callbacks;
+        }
         return this.singleton;
     }
 
     override cleanup(): void {
-        this._callbacks.onSignalingDisconnect?.();
         super.cleanup();
+        this._callbacks.onSignalingDisconnect?.();
+        RTCBridgeViewer.singleton = undefined;
     }
 
     protected override async _registerSignalingClientCallbacks(

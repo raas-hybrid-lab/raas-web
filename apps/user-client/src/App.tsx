@@ -1,8 +1,8 @@
 import "./init";
 import { ThemeProvider, createTheme, CssBaseline, Container, Typography, Button } from '@mui/material';
-import RobotView from './components/RobotView';
+// import RobotView from './components/RobotView';
 import './App.css';
-import { RTCBridgeViewer } from '@raas-web/webrtc-bridge';
+import { useRTCBridgeViewer } from '@raas-web/raas-react';
 
 const theme = createTheme({
   palette: {
@@ -11,10 +11,16 @@ const theme = createTheme({
 });
 
 function App() {
+
+  const { bridge, loading, error } = useRTCBridgeViewer({});
+
   const handleStartWebRTCViewer = async () => {
     console.log('Starting WebRTC Viewer...');
-    const rtcBridgeViewer = await RTCBridgeViewer.getInstance({});
-    rtcBridgeViewer.start();
+    if (bridge) {
+      bridge.start();
+    } else {
+      console.error('RTCBridgeViewer not initialized');
+    }
   }
 
   return (
@@ -28,7 +34,11 @@ function App() {
           variant="contained" 
           color="primary"
           onClick={handleStartWebRTCViewer}
-          sx={{ mb: 2 }}
+          sx={{ 
+            mb: 2,
+            opacity: loading || error || !bridge?.isRunning() ? 0.5 : 1
+          }}
+          // disabled={loading || error || !bridge?.isRunning() }
         >
           Start WebRTC Viewer
         </Button>
