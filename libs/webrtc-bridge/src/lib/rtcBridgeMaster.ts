@@ -72,27 +72,60 @@ export class RTCBridgeMaster extends RTCBridgeBase {
             // nothing more to do here--we just have to wait for user clients to send offers to connect.
         });
 
-        signalingClient.on('sdpOffer', async offer => {
+        signalingClient.on('sdpOffer', async (offer: RTCSessionDescription, remoteClientId: string | undefined) => {
             // we've got an offer from a new client!
             // add them to the list and let our user know.
-            const peerConnection = new RTCPeerConnection(rtcConfig);
-            this._peerConnections.set(offer.clientId, peerConnection);
+            remoteClientId = remoteClientId ?? 'remote';
+            console.debug(`SDP Offer received from peer "${remoteClientId}"...`, offer);
 
-            console.debug(`SDP Offer received from peer "${offer.ClientId}"...`, offer);
+
+            // Close any previous peer connection, in case a peer with the same clientId sends another connection
+            const oldPeerConnection = this._peerConnections.get(remoteClientId);
+            if (oldPeerConnection && oldPeerConnection.connectionState !== 'closed') {
+                oldPeerConnection.close();
+            }
+
+            // create & set the new peer connection in our list
+            const peerConnection = new RTCPeerConnection(rtcConfig);
+            this._peerConnections.set(remoteClientId, peerConnection);
 
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
             peerConnection.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated for peer "${offer.ClientId}"...`, candidate);
+                console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
                 if (candidate) {
                     signalingClient?.sendIceCandidate(candidate);
                 } else {
-                    console.debug(`No more ICE candidates will be generated for peer "${offer.ClientId}"...`);
+                    console.debug(`No more ICE candidates will be generated for peer "${remoteClientId}"...`);
                 }
             });
 
+            peerConnection.addEventListener('connectionstatechange', () => {
+                console.debug('[VIEWER] Peer connection state changed:', peerConnection.connectionState);
+            });
+
+            // send an answer to the peer
+            console.log(this._loggingPrefix, 'Creating SDP answer for', remoteClientId);
+            await peerConnection.setLocalDescription(
+                await peerConnection.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true,
+                }),
+            );
+            const sessionDescription = peerConnection.localDescription;
+            if (!sessionDescription) {
+                throw new Error("No local description to send to lab client...this should never happen.");
+            }
+
+            console.log(this._loggingPrefix, 'Sending SDP answer to', remoteClientId);
+            const correlationId = this.generateCorrelationId();
+            console.debug(this._loggingPrefix, 'SDP answer:', sessionDescription, 'correlationId:', correlationId);
+            signalingClient.sendSdpAnswer(sessionDescription, remoteClientId, correlationId);
+
+            console.log(`[MASTER] Peer ${remoteClientId} connected!`);
+
             // let our user handle the rest.
-            this._callbacks.onPeerConnected?.(peerConnection, offer.clientId);
+            this._callbacks.onPeerConnected?.(peerConnection, remoteClientId);
         });
 
         signalingClient.on('sdpAnswer', async answer => {

@@ -94,22 +94,28 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             });
             await this.peerConnection.setLocalDescription(offer);
             if (this.peerConnection.localDescription) {
+                console.debug('[VIEWER] Sending SDP offer with local description:', this.peerConnection.localDescription);
                 signalingClient.sendSdpOffer(this.peerConnection.localDescription);
             }
             else {
                 // unsure why this would happen, but typing indicates it's possible
                 throw new Error("No local description to send to lab client.");
             }
+            console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
 
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            this.peerConnection?.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated...`, candidate);
+            this.peerConnection.addEventListener('icecandidate', ({ candidate }) => {
+                console.debug(`ICE candidate generated. Sending to lab client...`, candidate);
                 if (candidate) {
                     signalingClient.sendIceCandidate(candidate);
                 } else {
                     console.debug(`No more ICE candidates will be generated.`);
                 }
+            });
+
+            this.peerConnection.addEventListener('connectionstatechange', () => {
+                console.debug('[VIEWER] Peer connection state changed:', this.peerConnection?.connectionState);
             });
 
         });
@@ -121,15 +127,26 @@ export class RTCBridgeViewer extends RTCBridgeBase {
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
             // we've got an answer from the lab client!
-            console.debug(`SDP Answer received...`, answer);
+            console.log('[VIEWER] Received SDP answer');
+            console.debug('SDP answer:', answer);
 
             // let our user handle the rest.
             if (this.peerConnection) {
+                await this.peerConnection.setRemoteDescription(answer);
                 this._callbacks.onMasterConnected?.(this.peerConnection);
             }
             else {
                 console.error("No peer connection to send to user upon SDP Answer...this shouldn't happen.");
             }
+        });
+
+        signalingClient.on('close', () => {
+            // the signaling client has closed.
+            // this means that we're disconnected from AWS and can't receive new peer connections. 
+            // TODO handle this by awaiting a new client connection
+            // for now we'll just let the user handle it.
+            console.error("Signaling client closed. We're disconnected from AWS.");
+            this._callbacks.onSignalingDisconnect?.();
         });
 
         signalingClient.on('error', (error: Error) => {
@@ -145,14 +162,6 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             this._callbacks.onSignalingError?.(status);
         })
 
-        signalingClient.on('close', () => {
-            // the signaling client has closed.
-            // this means that we're disconnected from AWS and can't receive new peer connections. 
-            // TODO handle this by awaiting a new client connection
-            // for now we'll just let the user handle it.
-            console.error("Signaling client closed. We're disconnected from AWS.");
-            this._callbacks.onSignalingDisconnect?.();
-        });
     }
 
 }

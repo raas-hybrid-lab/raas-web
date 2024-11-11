@@ -52,6 +52,13 @@ export abstract class RTCBridgeBase {
     }
 
     /**
+     * Generates a correlation ID for use SDP answers
+     */
+    protected generateCorrelationId(): string {
+        return Date.now().toString();
+    }
+
+    /**
      * Registers callbacks for the signaling client, allowing us to handle the resulting connections ourselves.
      */
     protected abstract _registerSignalingClientCallbacks(signalingClient: KVSWebRTC.SignalingClient, rtcConfig: RTCConfiguration): Promise<void>;

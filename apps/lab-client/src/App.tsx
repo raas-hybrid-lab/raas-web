@@ -45,7 +45,7 @@ function App() {
               mt: 2,
               opacity: loading || error ? 0.5 : 1
             }}
-            // disabled={error || loading} 
+            disabled={bridge?.isRunning() ?? false}
           >
             Start WebRTC Master
           </Button>
