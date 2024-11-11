@@ -10,6 +10,7 @@
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { RTCBridgeBase } from './rtcBridgeBase';
+import { Answerer } from './answerer';
 
 export type RTCBridgeMasterCallbacks = {
     onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
@@ -89,6 +90,23 @@ export class RTCBridgeMaster extends RTCBridgeBase {
             const peerConnection = new RTCPeerConnection(rtcConfig);
             this._peerConnections.set(remoteClientId, peerConnection);
 
+            const answerer = new Answerer(
+                rtcConfig,
+                null,
+                offer,
+                remoteClientId,
+                signalingClient,
+                true,
+                false,
+                this._loggingPrefix,
+                () => true,
+                () => true,
+                undefined,
+                undefined,
+            );
+            await answerer.init();
+            console.log(`[MASTER] Answerer initialized for peer "${remoteClientId}"...`);
+
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
             peerConnection.addEventListener('icecandidate', ({ candidate }) => {
@@ -103,24 +121,6 @@ export class RTCBridgeMaster extends RTCBridgeBase {
             peerConnection.addEventListener('connectionstatechange', () => {
                 console.debug('[VIEWER] Peer connection state changed:', peerConnection.connectionState);
             });
-
-            // send an answer to the peer
-            console.log(this._loggingPrefix, 'Creating SDP answer for', remoteClientId);
-            await peerConnection.setLocalDescription(
-                await peerConnection.createAnswer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: true,
-                }),
-            );
-            const sessionDescription = peerConnection.localDescription;
-            if (!sessionDescription) {
-                throw new Error("No local description to send to lab client...this should never happen.");
-            }
-
-            console.log(this._loggingPrefix, 'Sending SDP answer to', remoteClientId);
-            const correlationId = this.generateCorrelationId();
-            console.debug(this._loggingPrefix, 'SDP answer:', sessionDescription, 'correlationId:', correlationId);
-            signalingClient.sendSdpAnswer(sessionDescription, remoteClientId, correlationId);
 
             console.log(`[MASTER] Peer ${remoteClientId} connected!`);
 
