@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import RobotsManager from '../services/robotsManager';
+import RobotsManager, { RobotsManagerCallbacks } from '../services/robotsManager';
 
-const useRobotsManager = () => {
+const useRobotsManager = (callbacks: RobotsManagerCallbacks) => {
   const [manager, setManager] = useState<RobotsManager | undefined>(undefined); // Adjust the type as needed
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -10,7 +10,7 @@ const useRobotsManager = () => {
     const setupManager = async () => {
       try {
         setLoading(true);
-        const mgr = await RobotsManager.getInstance();
+        const mgr = await RobotsManager.getInstance(callbacks);
         setManager(mgr);
       } catch (err) {
         setError('Failed to set up robots manager with error: ' + err);
@@ -20,9 +20,10 @@ const useRobotsManager = () => {
     };
 
     setupManager();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array means this runs once on mount
 
-  return { manager, loading, error };
+  return { manager, rtcMaster: manager?.rtcMaster, loading, error };
 };
 
 export default useRobotsManager;

@@ -1,4 +1,30 @@
 import { RTCBridgeMaster } from '@raas-web/webrtc-bridge';
+import { RobotDriver } from './robotDriverBase';
+import { VideoChatDriver } from './drivers/videoChatDriver';
+import { v4 as uuid } from 'uuid';
+
+
+const _driverClasses = [
+    VideoChatDriver
+];
+
+type DriverClass = typeof _driverClasses[number];
+
+
+export type RobotsManagerCallbacks = {
+    // when a robot connects to us
+    onRobotConnected?: (driver: RobotDriver) => void;
+    onRobotDisconnected?: (driver: RobotDriver) => void;
+    onRobotError?: (driver: RobotDriver, error: Error) => void;
+
+    // when a user connects to us
+    onUserClientConnected?: (clientId: string) => void;
+    onUserClientDisconnected?: (clientId: string) => void;
+
+    // when a user is paired with a robot 
+    onRobotInUse?: (driver: RobotDriver) => void;
+    onRobotNotInUse?: (driver: RobotDriver) => void;
+}
 
 // RobotsManager class
 class RobotsManager {
@@ -12,35 +38,58 @@ class RobotsManager {
      */
     private static singleton: RobotsManager | undefined;
 
-    private rtc: RTCBridgeMaster | undefined;
-
-    private constructor() {
-        this.rtc = undefined;
+    private rtc: RTCBridgeMaster;
+    private driversById: Map<string, RobotDriver>;
+    private callbacks: RobotsManagerCallbacks;
+    /*
+        Constructor for RobotsManager.
+        @param rtcMaster - The RTCBridgeMaster instance to use for managing connections. Must be initialized.
+     */
+    constructor(rtcMaster: RTCBridgeMaster, callbacks: RobotsManagerCallbacks) {
+        this.rtc = rtcMaster;
+        this.driversById = new Map();
+        this.callbacks = callbacks;
     }
 
-    public static async getInstance(): Promise<RobotsManager> {
+    public static async getInstance(callbacks: RobotsManagerCallbacks): Promise<RobotsManager> {
         if (!RobotsManager.singleton) {
-            RobotsManager.singleton = new RobotsManager();
+            // todo add real callbacks
+            // for now we're just testing the bridge master
+            // in the future we'll use incoming connections to create new robot drivers
+            RobotsManager.singleton = new RobotsManager(await RTCBridgeMaster.getInstance({}), callbacks);
             await RobotsManager.singleton.setup();
         }
         return RobotsManager.singleton;
     }
 
     private async setup() {
-        // todo add real callbacks
-        // for now we're just testing the bridge master
-        // in the future we'll use incoming connections to create new robot drivers
-        this.rtc = await RTCBridgeMaster.getInstance({});
+        // start looking for robots or something idk we'll see if we end up needing anything here
+        console.log('Setting up robots manager...');
     }
 
-    public async startRTCMaster(): Promise<void> {
-        if (!this.rtc) {
-            // this should never happen
-            throw new Error("RTC bridge master not initialized.");
-        }
-        await this.rtc?.start();
+    get rtcMaster(): RTCBridgeMaster {
+        return this.rtc;
     }
 
+    static get possibleDrivers(): typeof _driverClasses {
+        return _driverClasses;
+    }
+
+    async connectRobot(driverClass: DriverClass ): Promise<void> {
+        const robotId = this.generateRobotId(driverClass);
+
+        const driver = new driverClass(robotId);
+        await driver.connectRobot();
+        this.driversById.set(driver.robotId, driver);
+        // we use a callback here in case we want to handle the case where the robot connects to us
+        // without the UI asking for it--so this is more general than just returning the driver
+        this.callbacks.onRobotConnected?.(driver);
+    }
+
+    private generateRobotId(driverClass: DriverClass): string {
+        // for now, just stick a uuid after the driver name
+        return driverClass.robotName.toLowerCase().replace(' ', '-') + '-' + uuid();
+    }
 }
 
 export default RobotsManager;

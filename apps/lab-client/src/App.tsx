@@ -5,10 +5,11 @@ import RobotList from './components/RobotList'
 import './App.css'
 // import useRobotsManager from './hooks/useRobotsManager'
 import { useRTCBridgeMaster } from '@raas-web/raas-react'
+import useRobotsManager from './hooks/useRobotsManager'
 
 function App() {
 
-  const { bridge, loading, error } = useRTCBridgeMaster({});
+  const { manager, rtcMaster, loading: robotsLoading, error: robotsError } = useRobotsManager({});
 
   const [selectedRobot, setSelectedRobot] = useState<string | null>(null)
 
@@ -22,8 +23,8 @@ function App() {
 
   const handleStartWebRTC = () => {
     console.log('Starting WebRTC Master...')
-    if (bridge) {
-      bridge.start()
+    if (rtcMaster) {
+      rtcMaster.start()
     }
     else {
       console.error('Robots manager not initialized')
@@ -43,9 +44,9 @@ function App() {
             onClick={handleStartWebRTC}
             sx={{ 
               mt: 2,
-              opacity: loading || error ? 0.5 : 1
+              opacity: robotsLoading || robotsError ? 0.5 : 1
             }}
-            disabled={bridge?.isRunning() ?? false}
+            disabled={rtcMaster?.isRunning() ?? false}
           >
             Start WebRTC Master
           </Button>
