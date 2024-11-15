@@ -15,6 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@raas-web/raas-react": ["libs/raas-react/src/index.ts"],
       "@raas-web/webrtc-bridge": ["libs/webrtc-bridge/src/index.ts"]
     }
   },

@@ -9,10 +9,11 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import ChannelHelper, { AWSClientArgs } from './channelHelper';
+import { RTCBridgeBase } from './rtcBridgeBase';
+import { v4 as uuid } from 'uuid';
 
 
-type RTCBridgeViewerCallbacks = {
+export type RTCBridgeViewerCallbacks = {
     onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error | object) => void,
@@ -35,42 +36,28 @@ type SignalingClientStatusResponse = {
     statusResponse: StatusResponseInner;
 };
 
-export class RTCBridgeViewer {
+export class RTCBridgeViewer extends RTCBridgeBase {
     /**
      * Singleton class for managing the RTC connection with the lab client.
      */
 
     private static singleton: RTCBridgeViewer | undefined;
-
-    private _channelHelper: ChannelHelper;
-    private readonly _callbacks: RTCBridgeViewerCallbacks
-    private readonly _clientConfig: AWSClientArgs;
-
-    // peerConnection to the lab client
+    private _callbacks: RTCBridgeViewerCallbacks
     private peerConnection: RTCPeerConnection | undefined;
 
     private constructor(
         callbacks: RTCBridgeViewerCallbacks,
     ) {
-        this._callbacks = callbacks;
-        this._clientConfig = {
-            accessKeyId: import.meta.env['VITE_AWS_ACCESS_KEY_ID'],
-            secretAccessKey: import.meta.env['VITE_AWS_SECRET_ACCESS_KEY'],
-            sessionToken: import.meta.env['VITE_AWS_SESSION_TOKEN'],
-            region: import.meta.env['VITE_KINESIS_REGION'],
-        }
-
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        const clientId = import.meta.env['VITE_KINESIS_CLIENT_ID'];
-        this._channelHelper = new ChannelHelper(
-            channelName, 
-            this._clientConfig, 
-            null, 
-            KVSWebRTC.Role.VIEWER, 
-            ChannelHelper.IngestionMode.OFF, 
-            "[VIEWER]", 
+        const clientId = RTCBridgeViewer.generateClientId();
+
+        super(
+            channelName,
+            KVSWebRTC.Role.VIEWER,
+            "[VIEWER]",
             clientId
         );
+        this._callbacks = callbacks;
         this.peerConnection = undefined;
     }
 
@@ -78,37 +65,20 @@ export class RTCBridgeViewer {
         if (!this.singleton) {
             this.singleton = new RTCBridgeViewer(callbacks);
         }
+        else {
+            console.warn("RTCBridgeViewer singleton already exists. Returning existing instance & setting new callbacks.");
+            this.singleton._callbacks = callbacks;
+        }
         return this.singleton;
     }
 
-    cleanup(): void {
-        this._channelHelper.getSignalingClient()?.close();
+    override cleanup(): void {
+        super.cleanup();
         this._callbacks.onSignalingDisconnect?.();
+        RTCBridgeViewer.singleton = undefined;
     }
 
-
-    async startViewer(): Promise<void> {
-        await this._channelHelper?.init();
-        const iceServers: RTCIceServer[] = [];
-        // add STUN and TURN servers
-        iceServers.push({urls: `stun:stun.kinesisvideo.${this._clientConfig.region}.amazonaws.com:443`});
-        iceServers.push(...(await this._channelHelper.fetchTurnServers()));
-        console.log(`[VIEWER]`, 'ICE servers:', iceServers);
-
-        const configuration: RTCConfiguration = {
-            iceServers,
-            iceTransportPolicy: 'all',
-        };
-
-        const signalingClient = this._channelHelper.getSignalingClient();
-        await this._registerSignalingClientCallbacks(signalingClient, configuration);
-
-        console.debug("Opening signaling client...");
-        signalingClient.open();
-    }
-
-
-    private async _registerSignalingClientCallbacks(
+    protected override async _registerSignalingClientCallbacks(
         signalingClient: KVSWebRTC.SignalingClient,
         rtcConfig: RTCConfiguration,
     ): Promise<void> {
@@ -124,22 +94,28 @@ export class RTCBridgeViewer {
             });
             await this.peerConnection.setLocalDescription(offer);
             if (this.peerConnection.localDescription) {
+                console.debug('[VIEWER] Sending SDP offer with local description:', this.peerConnection.localDescription);
                 signalingClient.sendSdpOffer(this.peerConnection.localDescription);
             }
             else {
                 // unsure why this would happen, but typing indicates it's possible
                 throw new Error("No local description to send to lab client.");
             }
+            console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
 
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            this.peerConnection?.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated...`, candidate);
+            this.peerConnection.addEventListener('icecandidate', ({ candidate }) => {
+                console.debug(`ICE candidate generated. Sending to lab client...`, candidate);
                 if (candidate) {
                     signalingClient.sendIceCandidate(candidate);
                 } else {
                     console.debug(`No more ICE candidates will be generated.`);
                 }
+            });
+
+            this.peerConnection.addEventListener('connectionstatechange', () => {
+                console.debug('[VIEWER] Peer connection state changed:', this.peerConnection?.connectionState);
             });
 
         });
@@ -151,15 +127,27 @@ export class RTCBridgeViewer {
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
             // we've got an answer from the lab client!
-            console.debug(`SDP Answer received...`, answer);
+            console.debug('[VIEWER] Received SDP answer');
+            console.debug('SDP answer:', answer);
 
             // let our user handle the rest.
             if (this.peerConnection) {
+                console.log('[VIEWER] Connected to lab client!');
+                await this.peerConnection.setRemoteDescription(answer);
                 this._callbacks.onMasterConnected?.(this.peerConnection);
             }
             else {
                 console.error("No peer connection to send to user upon SDP Answer...this shouldn't happen.");
             }
+        });
+
+        signalingClient.on('close', () => {
+            // the signaling client has closed.
+            // this means that we're disconnected from AWS and can't receive new peer connections. 
+            // TODO handle this by awaiting a new client connection
+            // for now we'll just let the user handle it.
+            console.error("Signaling client closed. We're disconnected from AWS.");
+            this._callbacks.onSignalingDisconnect?.();
         });
 
         signalingClient.on('error', (error: Error) => {
@@ -175,14 +163,11 @@ export class RTCBridgeViewer {
             this._callbacks.onSignalingError?.(status);
         })
 
-        signalingClient.on('close', () => {
-            // the signaling client has closed.
-            // this means that we're disconnected from AWS and can't receive new peer connections. 
-            // TODO handle this by awaiting a new client connection
-            // for now we'll just let the user handle it.
-            console.error("Signaling client closed. We're disconnected from AWS.");
-            this._callbacks.onSignalingDisconnect?.();
-        });
+    }
+
+    static generateClientId(): string {
+        // eventually will use user-associated clientId once we have user auth
+        return "raas-viewer-" + uuid();
     }
 
 }

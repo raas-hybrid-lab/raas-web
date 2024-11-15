@@ -1,13 +1,6 @@
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { KinesisVideo, KinesisVideoSignalingChannels, KinesisVideoWebRTCStorage } from 'aws-sdk';
-
-
-export type AWSClientArgs = {
-    region: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    sessionToken?: string;
-}
+import { AWSClientArgs } from './awsConfig';
 
 class ChannelHelper {
     static IngestionMode = {
