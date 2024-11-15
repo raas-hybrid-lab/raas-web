@@ -10,6 +10,7 @@
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { RTCBridgeBase } from './rtcBridgeBase';
+import { v4 as uuid } from 'uuid';
 
 
 export type RTCBridgeViewerCallbacks = {
@@ -48,8 +49,7 @@ export class RTCBridgeViewer extends RTCBridgeBase {
         callbacks: RTCBridgeViewerCallbacks,
     ) {
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        // hardcoded for now--not sure if we need to make this dynamic
-        const clientId = "raas-viewer";
+        const clientId = RTCBridgeViewer.generateClientId();
 
         super(
             channelName,
@@ -127,11 +127,12 @@ export class RTCBridgeViewer extends RTCBridgeBase {
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
             // we've got an answer from the lab client!
-            console.log('[VIEWER] Received SDP answer');
+            console.debug('[VIEWER] Received SDP answer');
             console.debug('SDP answer:', answer);
 
             // let our user handle the rest.
             if (this.peerConnection) {
+                console.log('[VIEWER] Connected to lab client!');
                 await this.peerConnection.setRemoteDescription(answer);
                 this._callbacks.onMasterConnected?.(this.peerConnection);
             }
@@ -162,6 +163,11 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             this._callbacks.onSignalingError?.(status);
         })
 
+    }
+
+    static generateClientId(): string {
+        // eventually will use user-associated clientId once we have user auth
+        return "raas-viewer-" + uuid();
     }
 
 }
