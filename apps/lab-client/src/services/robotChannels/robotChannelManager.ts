@@ -19,17 +19,19 @@ export class RobotChannelManager {
 
     addChannel(channel: RobotChannel): void {
         // Implementation for adding a channel goes here
-        console.log('Adding channel...');
+        console.log('Adding channel...', channel);
 
-        // if it's an AV stream channel, send metadata about it
+        // if it's an AV stream channel, add tracks & send metadata about them
         if (channel instanceof RobotAVStreamChannel) {
+            for (const track of channel.stream.getTracks()) {
+                this.peer.addTrack(track, channel.stream);
+            }
             this._sendMetadata(channel.stream);
         }
-
-        // if it's a data channel, not much to do.
+        // if it's a data channel, not much to do (yet)
     }
 
-    private async _sendMetadata(stream: MediaStream): Promise<void> {
+    private _sendMetadata(stream: MediaStream): void {
         console.debug(`Sending metadata for stream: ${stream}`);
         // TODO: implement
     }

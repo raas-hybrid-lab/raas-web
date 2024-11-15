@@ -3,8 +3,9 @@ import { Box, Stack } from '@mui/material';
 import CommandBox from './CommandBox';
 import VideoView from './VideoView';
 import TelemetryBox from './TelemetryBox';
+import { RobotController } from '../services/robotController';
 
-const RobotView: React.FC = () => {
+const RobotView: React.FC<{ robotController: RobotController }> = ({ robotController }) => {
   const [telemetryHistory, setTelemetryHistory] = useState<string[]>([]);
 
   const handleCommandSubmit = (command: string) => {
@@ -17,8 +18,7 @@ const RobotView: React.FC = () => {
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <VideoView title="Front Camera" source="webcam" />
-          <VideoView title="Room Monitor" source="webcam" />
+          <VideoView title="Room Monitor" stream={robotController.roomMonitorStream} />
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <Box sx={{ flex: 1 }}>
