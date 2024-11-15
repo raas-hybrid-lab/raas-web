@@ -8,7 +8,7 @@ const _driverClasses = [
     VideoChatDriver
 ];
 
-type DriverClass = typeof _driverClasses[number];
+export type DriverClass = typeof _driverClasses[number];
 
 
 export type RobotsManagerCallbacks = {

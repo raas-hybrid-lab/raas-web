@@ -3,9 +3,8 @@ import { Button } from '@mui/material'
 import CameraSelector from './components/CameraSelector'
 import RobotList from './components/RobotList'
 import './App.css'
-// import useRobotsManager from './hooks/useRobotsManager'
-import { useRTCBridgeMaster } from '@raas-web/raas-react'
 import useRobotsManager from './hooks/useRobotsManager'
+import RobotsManager, { DriverClass } from './services/robotsManager'
 
 function App() {
 
@@ -17,8 +16,9 @@ function App() {
     console.log(`Selected camera with deviceId: ${deviceId}`)
   }
 
-  const handleRobotSelect = (robotId: string) => {
-    setSelectedRobot(robotId)
+  const handleRobotSelect = (driver: DriverClass) => {
+    setSelectedRobot(driver.robotName);
+    manager?.connectRobot(driver);
   }
 
   const handleStartWebRTC = () => {
@@ -52,8 +52,8 @@ function App() {
           </Button>
         </div>
         <div className="right-column">
-          <h2>Active Robots</h2>
-          <RobotList onSelect={handleRobotSelect} selectedRobot={selectedRobot} />
+          <h2>Available Robots</h2>
+          <RobotList onSelect={handleRobotSelect} selectedRobot={selectedRobot} robots={RobotsManager.possibleDrivers ?? []} />
         </div>
       </div>
     </div>

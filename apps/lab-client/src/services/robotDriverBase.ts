@@ -31,6 +31,10 @@ export abstract class RobotDriver {
         throw new Error('robotName must be implemented by each subclass');
     }
 
+    get robotName(): string {
+        return this.robotName;
+    }
+
     async connectRobot(): Promise<void> {
         // Attempt to connect the driver to the robot
         console.log(`Connecting to robot with ID: ${this.robotId}`);
