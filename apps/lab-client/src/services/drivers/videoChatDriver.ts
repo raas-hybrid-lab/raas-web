@@ -4,7 +4,7 @@
  * Provides a simple video chat interface between the user and the lab.
  */
 
-import { RobotAVStreamChannel } from "../robotChannel";
+import { RobotAVStreamChannel } from "../robotChannels/robotChannel";
 import { RobotDriver } from "../robotDriverBase";
 
 export class VideoChatDriver extends RobotDriver {

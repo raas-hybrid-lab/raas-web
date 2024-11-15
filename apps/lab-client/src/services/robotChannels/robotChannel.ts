@@ -36,45 +36,24 @@ export class RobotAVStreamChannel extends RobotChannel {
 /*
     RobotDataChannel is a wrapper around a data channel.
 */
-export class RobotDataChannel extends RobotChannel {
-    channel: RTCDataChannel;
+export abstract class RobotDataChannel extends RobotChannel {
+    private _channel: RTCDataChannel;
 
-    constructor(name: string, channel: RTCDataChannel) {
+    constructor(name: string, peer: RTCPeerConnection) {
         super(name);
-        this.channel = channel;
-    }
-}
-
-// todo: define some data channel types. start with a simple one for sending/receiving text messages.
-// use zod to define the schema for the data channel's messages
-
-export class RobotChannelManager {
-    peer: RTCPeerConnection;
-
-    constructor(peer: RTCPeerConnection) {
-        this.peer = peer;
+        this._channel = peer.createDataChannel(name);
+        this._channel.onmessage = (event) => this.onReceiveMessage(event.data);
     }
 
-    async setup(): Promise<void> {
-        console.log('Setting up channel manager...');
-
-        // TODO: set up metadata channel so we can send/receive metadata about AV streams & anything else we may need.
+    private onReceiveMessage(message: string): void {
+        console.debug(`RobotDataChannel.onReceiveMessage: ${message}`);
+        this._onReceiveMessage(message);
     }
 
-    addChannel(channel: RobotChannel): void {
-        // Implementation for adding a channel goes here
-        console.log('Adding channel...');
+    protected abstract _onReceiveMessage(message: string): void;
 
-        // if it's an AV stream channel, send metadata about it
-        if (channel instanceof RobotAVStreamChannel) {
-            this.sendMetadata(channel.stream);
-        }
-
-        // if it's a data channel, not much to do.
-    }
-
-    private async sendMetadata(stream: MediaStream): Promise<void> {
-        console.debug(`Sending metadata for stream: ${stream}`);
-        // TODO: implement
+    // encapsulating for easy mocking
+    protected send(message: string): void {
+        this._channel.send(message);
     }
 }

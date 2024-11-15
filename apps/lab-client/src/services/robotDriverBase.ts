@@ -1,4 +1,4 @@
-import { RobotChannelManager } from "./robotChannel";
+import { RobotChannelManager } from "./robotChannels/robotChannelManager";
 
 /*
     RobotDriver is the base class for all robot drivers.
@@ -54,7 +54,7 @@ export abstract class RobotDriver {
         }
 
         // Connect the peer to the driver
-        this._channelManager = new RobotChannelManager(peerConnection);
+        this._channelManager = new RobotChannelManager(peerConnection, 'master');
         console.log(`User connected to robot ${this.robotId} with peer connection: ${peerConnection}`);
         await this._connectUser(peerConnection);
     }
