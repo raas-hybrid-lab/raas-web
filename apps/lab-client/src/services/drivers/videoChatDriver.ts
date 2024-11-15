@@ -4,17 +4,28 @@
  * Provides a simple video chat interface between the user and the lab.
  */
 
+import { RobotAVStreamChannel } from "../robotChannel";
 import { RobotDriver } from "../robotDriverBase";
 
 export class VideoChatDriver extends RobotDriver {
+    webcamStream: MediaStream | undefined;
+
     static get robotName(): string {
         return "Video Chat";
     }
 
-    protected _connectRobot(): Promise<void> {
-        throw new Error("Method not implemented.");
+    protected async _connectRobot(): Promise<void> {
+        // for "connecting to the robot", we just add a stream from the webcam
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        this.webcamStream = stream;
     }
-    protected _connectUser(peerConnection: RTCPeerConnection): Promise<void> {
-        throw new Error("Method not implemented.");
+
+    protected async _connectUser(peerConnection: RTCPeerConnection): Promise<void> {
+        if (this.webcamStream) {
+            this.channelManager?.addChannel(new RobotAVStreamChannel('webcam', this.webcamStream.getTracks()));
+        }
+        else {
+            throw new Error('No webcam stream found (this should never happen)');
+        }
     }
 }

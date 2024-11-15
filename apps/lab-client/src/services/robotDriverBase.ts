@@ -26,6 +26,10 @@ export abstract class RobotDriver {
         return this._robotId;
     }
 
+    protected get channelManager(): RobotChannelManager | undefined {
+        return this._channelManager;
+    }
+
     // The non-unique name of type of robot this driver controls. Should be hardcoded by each subclass.
     static get robotName(): string {
         throw new Error('robotName must be implemented by each subclass');

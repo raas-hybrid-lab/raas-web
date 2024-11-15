@@ -58,15 +58,23 @@ export class RobotChannelManager {
     async setup(): Promise<void> {
         console.log('Setting up channel manager...');
 
-        // todo: set up metadata channel so we can send/receive metadata about AV streams & anything else we may need.
+        // TODO: set up metadata channel so we can send/receive metadata about AV streams & anything else we may need.
     }
 
     addChannel(channel: RobotChannel): void {
         // Implementation for adding a channel goes here
         console.log('Adding channel...');
 
-        // if it's an AV stream channel, send metadata about it.
+        // if it's an AV stream channel, send metadata about it
+        if (channel instanceof RobotAVStreamChannel) {
+            this.sendMetadata(channel.stream);
+        }
 
         // if it's a data channel, not much to do.
+    }
+
+    private async sendMetadata(stream: MediaStream): Promise<void> {
+        console.debug(`Sending metadata for stream: ${stream}`);
+        // TODO: implement
     }
 }
