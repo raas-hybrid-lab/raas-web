@@ -63,7 +63,13 @@ export abstract class RTCSignalingBase {
     }
 
     public sendSdpOffer(offer: RTCSessionDescription): void {
-        this._channelHelper.getSignalingClient()?.sendSdpOffer(offer);
+        const client = this._channelHelper.getSignalingClient();
+        if (client) {
+            client.sendSdpOffer(offer);
+        }
+        else {
+            console.error("Signaling client not connected. Can't send SDP offer.");
+        }
     }
 
     /**

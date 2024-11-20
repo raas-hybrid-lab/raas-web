@@ -14,24 +14,21 @@ import type { RTCSignalingBase } from './rtcSignalingBase';
  * all callbacks etc for the RTCPeerConnection instance once it's created.
  */
 export class RTCPeerWrapper {
-    private _peerConnection: RTCPeerConnection;
+    private _peer: RTCPeerConnection;
     private _signalingClient: RTCSignalingBase;
     private _remoteClientId: string | undefined;
 
     private _dataChannels: Map<string, RTCDataChannel> = new Map();
     private _streams: Map<string, MediaStream> = new Map();
 
-    constructor(peerConnection: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined) {
-        this._peerConnection = peerConnection;
+    constructor(peer: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined) {
+        this._peer = peer;
         this._signalingClient = signalingClient;
-        this._remoteClientId = remoteClientId ?? 'master'; // default to master if no id is provided
+        remoteClientId = remoteClientId ?? 'master'; // default to master if no id is provided
+        this._remoteClientId = remoteClientId;
 
         // set up some key callbacks for the peer connection
-        this._peerConnection.addEventListener('connectionstatechange', () => {
-            console.log('[PEER] Peer connection state changed:', this._peerConnection.connectionState);
-        });
-
-        peerConnection.addEventListener('icecandidate', ({ candidate }) => {
+        peer.addEventListener('icecandidate', ({ candidate }) => {
             console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
             if (candidate) {
                 signalingClient?.sendIceCandidate(candidate);
@@ -40,17 +37,25 @@ export class RTCPeerWrapper {
             }
         });
 
-        peerConnection.addEventListener('connectionstatechange', () => {
-            console.log(`[PEER] Peer connection state changed for peer "${remoteClientId}":`, peerConnection.connectionState);
+        peer.addEventListener('connectionstatechange', () => {
+            console.log(`[PEER] Peer connection state changed for peer "${remoteClientId}":`, peer.connectionState);
         });
 
-        peerConnection.addEventListener('negotiationneeded', () => {
+        peer.addEventListener('signalingstatechange', () => {
+            console.log(`[PEER] Peer signaling state changed for peer "${remoteClientId}":`, peer.signalingState);
+        });
+
+        peer.addEventListener('track', (event) => {
+            console.log('[PEER] Track event:', event);
+        });
+
+        peer.addEventListener('negotiationneeded', () => {
             console.debug(`[PEER] Negotiation needed for peer "${remoteClientId}"...`);
-            peerConnection.createOffer().then(answer => peerConnection.setLocalDescription(answer))
+            peer.createOffer().then(answer => peer.setLocalDescription(answer))
                 .then(() => {
-                    if (peerConnection.localDescription) {
-                        signalingClient.sendSdpOffer(peerConnection.localDescription);
-                        console.debug(`[PEER] Negotiation answer sent for peer "${remoteClientId}"...`);
+                    if (peer.localDescription) {
+                        signalingClient.sendSdpOffer(peer.localDescription);
+                        console.info(`[PEER] Negotiation offer sent for peer "${remoteClientId}"...`);
                     }
                     else {
                         console.error(`[PEER] No local description to send for peer "${remoteClientId}"...`);
@@ -71,7 +76,7 @@ export class RTCPeerWrapper {
      * Internal peer connection instance. This should not be used outside of the signaling clients.
      */
     get _internalPeerConnection(): RTCPeerConnection {
-        return this._peerConnection;
+        return this._peer;
     }
 
     /**
@@ -88,7 +93,7 @@ export class RTCPeerWrapper {
         // todo figure out how to get the label to the other peer
         // will need a metadata channel of some kind.
         for (const track of stream.getTracks()) {
-            this._peerConnection.addTrack(track, stream);
+            this._peer.addTrack(track, stream);
         }
     }
 
@@ -99,7 +104,7 @@ export class RTCPeerWrapper {
      * @returns The data channel.
      */
     public addDataChannel(label: string): void {
-        const dataChannel = this._peerConnection.createDataChannel(label);
+        const dataChannel = this._peer.createDataChannel(label);
         this._dataChannels.set(label, dataChannel);
     }
 }
