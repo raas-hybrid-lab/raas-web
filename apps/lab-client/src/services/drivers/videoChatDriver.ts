@@ -4,7 +4,7 @@
  * Provides a simple video chat interface between the user and the lab.
  */
 
-import { RobotAVStreamChannel } from "../robotChannels/robotChannel";
+import { RTCPeerWrapper } from "@raas-web/webrtc-bridge";
 import { RobotDriver } from "../robotDriverBase";
 
 export class VideoChatDriver extends RobotDriver {
@@ -20,9 +20,9 @@ export class VideoChatDriver extends RobotDriver {
         this.webcamStream = stream;
     }
 
-    protected async _connectUser(peerConnection: RTCPeerConnection): Promise<void> {
+    protected async _connectUser(peerConnection: RTCPeerWrapper): Promise<void> {
         if (this.webcamStream) {
-            this.channelManager?.addChannel(new RobotAVStreamChannel('webcam', this.webcamStream.getTracks()));
+            peerConnection.addStream(this.webcamStream, "webcam");
         }
         else {
             throw new Error('No webcam stream found (this should never happen)');

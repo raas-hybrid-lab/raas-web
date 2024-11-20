@@ -1,4 +1,4 @@
-import { RobotChannelManager } from "./robotChannels/robotChannelManager";
+import { RTCPeerWrapper } from "@raas-web/webrtc-bridge";
 
 /*
     RobotDriver is the base class for all robot drivers.
@@ -10,12 +10,16 @@ import { RobotChannelManager } from "./robotChannels/robotChannelManager";
 export abstract class RobotDriver {
     // list of all subclasses of RobotDriver
     private _robotId: string;
-    private _channelManager: RobotChannelManager | undefined;
     private _robotConnected = false;
+    private _peer: RTCPeerWrapper | undefined;
 
     constructor(robotId: string) {
         this._robotId = robotId;
-        this._channelManager = undefined;
+        this._peer = undefined;
+    }
+
+    get peer(): RTCPeerWrapper | undefined {
+        return this._peer;
     }
 
     get robotConnected(): boolean {
@@ -24,10 +28,6 @@ export abstract class RobotDriver {
 
     get robotId(): string {
         return this._robotId;
-    }
-
-    protected get channelManager(): RobotChannelManager | undefined {
-        return this._channelManager;
     }
 
     // The non-unique name of type of robot this driver controls. Should be hardcoded by each subclass.
@@ -48,17 +48,16 @@ export abstract class RobotDriver {
 
     protected abstract _connectRobot(): Promise<void>;
 
-    async connectUser(peerConnection: RTCPeerConnection): Promise<void> {
+    async connectUser(peerConnection: RTCPeerWrapper): Promise<void> {
         if (!this._robotConnected) {
             throw new Error('Robot is not connected--user must connect to something else instead');
         }
 
         // Connect the peer to the driver
-        this._channelManager = new RobotChannelManager(peerConnection, 'master');
         console.log(`User connected to robot ${this.robotId} with peer connection: ${peerConnection}`);
         await this._connectUser(peerConnection);
     }
 
-    protected abstract _connectUser(peerConnection: RTCPeerConnection): Promise<void>;
+    protected abstract _connectUser(peerConnection: RTCPeerWrapper): Promise<void>;
 
 }

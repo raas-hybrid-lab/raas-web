@@ -4,7 +4,7 @@ import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
 
 
 /**
- * Base class for RTCBridgeMaster and RTCBridgeViewer.
+ * Base class for RTCSignalingMaster and RTCSignalingViewer.
  */
 export abstract class RTCSignalingBase {
     protected _channelHelper: ChannelHelper;
@@ -56,6 +56,14 @@ export abstract class RTCSignalingBase {
      */
     protected generateCorrelationId(): string {
         return Date.now().toString();
+    }
+
+    public sendIceCandidate(candidate: RTCIceCandidate): void {
+        this._channelHelper.getSignalingClient()?.sendIceCandidate(candidate);
+    }
+
+    public sendSdpOffer(offer: RTCSessionDescription): void {
+        this._channelHelper.getSignalingClient()?.sendSdpOffer(offer);
     }
 
     /**

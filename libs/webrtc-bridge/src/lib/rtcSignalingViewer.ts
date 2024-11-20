@@ -9,12 +9,13 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { RTCSignalingBase } from './rtcBridgeBase';
+import { RTCSignalingBase } from './rtcSignalingBase';
 import { v4 as uuid } from 'uuid';
+import { RTCPeerWrapper } from './rtcPeerWrapper';
 
 
 export type RTCSignalingViewerCallbacks = {
-    onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
+    onMasterConnected?: (peerConnection: RTCPeerWrapper) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error | object) => void,
 }
@@ -43,7 +44,7 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
     private static singleton: RTCSignalingViewer | undefined;
     private _callbacks: RTCSignalingViewerCallbacks
-    private _peerConnection: RTCPeerConnection | undefined;
+    private _peerConnection: RTCPeerWrapper | undefined;
 
     private constructor(
         callbacks: RTCSignalingViewerCallbacks,
@@ -78,7 +79,7 @@ export class RTCSignalingViewer extends RTCSignalingBase {
         RTCSignalingViewer.singleton = undefined;
     }
 
-    get peerConnection(): RTCPeerConnection | undefined {
+    get peerConnection(): RTCPeerWrapper | undefined {
         return this._peerConnection;
     }
 
@@ -91,15 +92,15 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             console.debug("Signaling client opened. We're connected to AWS. Making offer to lab client...");
 
             // create a peer connection and send an offer to the lab client.
-            this._peerConnection = new RTCPeerConnection(rtcConfig);
-            const offer = await this._peerConnection.createOffer({
+            const peerConnection = new RTCPeerConnection(rtcConfig);
+            const offer = await peerConnection.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true,
             });
-            await this._peerConnection.setLocalDescription(offer);
-            if (this._peerConnection.localDescription) {
-                console.debug('[VIEWER] Sending SDP offer with local description:', this._peerConnection.localDescription);
-                signalingClient.sendSdpOffer(this._peerConnection.localDescription);
+            await peerConnection.setLocalDescription(offer);
+            if (peerConnection.localDescription) {
+                console.debug('[VIEWER] Sending SDP offer with local description:', peerConnection.localDescription);
+                signalingClient.sendSdpOffer(peerConnection.localDescription);
             }
             else {
                 // unsure why this would happen, but typing indicates it's possible
@@ -107,20 +108,7 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             }
             console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
 
-            // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
-            // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            this._peerConnection.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated. Sending to lab client...`, candidate);
-                if (candidate) {
-                    signalingClient.sendIceCandidate(candidate);
-                } else {
-                    console.debug(`No more ICE candidates will be generated.`);
-                }
-            });
-
-            this._peerConnection.addEventListener('connectionstatechange', () => {
-                console.debug('[VIEWER] Peer connection state changed:', this._peerConnection?.connectionState);
-            });
+            this._peerConnection = new RTCPeerWrapper(peerConnection, this, undefined);
 
         });
 
@@ -137,24 +125,12 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             // let our user handle the rest.
             if (this._peerConnection) {
                 console.log('[VIEWER] Connected to lab client!');
-                await this._peerConnection.setRemoteDescription(answer);
+                await this._peerConnection._internalPeerConnection.setRemoteDescription(answer);
                 this._callbacks.onMasterConnected?.(this._peerConnection);
             }
             else {
                 console.error("No peer connection to send to user upon SDP Answer...this shouldn't happen.");
             }
-
-            this._peerConnection?.addEventListener('negotiationneeded', () => {
-                console.log('[VIEWER] Negotiation needed...sending offer...');
-                this._peerConnection?.createOffer().then(answer => this._peerConnection?.setLocalDescription(answer));
-                if (this._peerConnection?.localDescription) {
-                    console.log('[VIEWER] Sending SDP answer with local description:', this._peerConnection.localDescription);
-                    signalingClient.sendSdpAnswer(this._peerConnection.localDescription);
-                }
-                else {
-                    console.error('[VIEWER] No local description to send to lab client upon SDP Answer...this shouldn\'t happen.');
-                }
-            });
         });
 
         signalingClient.on('close', () => {

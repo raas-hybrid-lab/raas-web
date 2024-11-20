@@ -2,6 +2,7 @@ import { RTCSignalingMaster } from '@raas-web/webrtc-bridge';
 import { RobotDriver } from './robotDriverBase';
 import { VideoChatDriver } from './drivers/videoChatDriver';
 import { v4 as uuid } from 'uuid';
+import { RTCPeerWrapper } from '@raas-web/webrtc-bridge';
 
 
 const _driverClasses = [
@@ -55,7 +56,7 @@ class RobotsManager {
         if (!RobotsManager.singleton) {
             // todo add real callbacks for errors
             RobotsManager.singleton = new RobotsManager(await RTCSignalingMaster.getInstance({
-                onPeerConnected: (connection: RTCPeerConnection, peerId: string) => RobotsManager.singleton?.onPeerConnected(connection, peerId),
+                onPeerConnected: (connection: RTCPeerWrapper) => RobotsManager.singleton?.onPeerConnected(connection),
                 onSignalingDisconnect: () => { throw new Error("signaling disconnected"); },
                 onSignalingError: (error: Error) => { throw error; },
             }), callbacks);
@@ -69,8 +70,8 @@ class RobotsManager {
         console.log('Setting up robots manager...');
     }
 
-    private async onPeerConnected(connection: RTCPeerConnection, peerId: string) {
-        console.log('Peer connected (handling in robots manager):', peerId);
+    private async onPeerConnected(connection: RTCPeerWrapper) {
+        console.log('Peer connected (handling in robots manager):', connection.peerId);
 
         // hardcode setting up the first video chat robot in the map for now
         // so we don't have to implement complex state management yet
@@ -81,7 +82,6 @@ class RobotsManager {
             await this.connectRobot(VideoChatDriver);
             driver = this.driversById.values().next().value;
         }
-        // wait for 5 seconds
         driver?.connectUser(connection);
     }
 

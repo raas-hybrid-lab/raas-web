@@ -9,25 +9,26 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { RTCSignalingBase } from './rtcBridgeBase';
+import { RTCSignalingBase } from './rtcSignalingBase';
 import { Answerer } from './answerer';
 
+import { RTCPeerWrapper } from './rtcPeerWrapper';
+
 export type RTCSignalingMasterCallbacks = {
-    onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
+    onPeerConnected?: (peerConnection: RTCPeerWrapper) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error) => void,
 }
 
+/**
+ * Singleton class for managing RTC connections with user clients.
+ */
 export class RTCSignalingMaster extends RTCSignalingBase {
-    /**
-     * Singleton class for managing RTC connections with user clients.
-     */
-
     private static singleton: RTCSignalingMaster | undefined;
     private _callbacks: RTCSignalingMasterCallbacks
 
     // Map of clientId to peerConnection
-    private _peerConnections: Map<string, RTCPeerConnection>;
+    private _peerConnections: Map<string, RTCPeerWrapper>;
 
     private constructor(
         callbacks: RTCSignalingMasterCallbacks,
@@ -40,7 +41,7 @@ export class RTCSignalingMaster extends RTCSignalingBase {
             undefined
         );
         this._callbacks = callbacks;
-        this._peerConnections = new Map<string, RTCPeerConnection>();
+        this._peerConnections = new Map<string, RTCPeerWrapper>();
     }
 
     public static async getInstance(callbacks: RTCSignalingMasterCallbacks): Promise<RTCSignalingMaster> {
@@ -56,7 +57,7 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
     override cleanup(): void {
         super.cleanup();
-        this._peerConnections.forEach(peerConnection => peerConnection.close());
+        this._peerConnections.forEach(peerConnection => peerConnection._internalPeerConnection.close());
         this._peerConnections.clear();
         this._callbacks.onSignalingDisconnect?.();
         RTCSignalingMaster.singleton = undefined;
@@ -82,13 +83,14 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
             // Close any previous peer connection, in case a peer with the same clientId sends another connection
             const oldPeerConnection = this._peerConnections.get(remoteClientId);
-            if (oldPeerConnection && oldPeerConnection.connectionState !== 'closed') {
-                oldPeerConnection.close();
+            if (oldPeerConnection && oldPeerConnection._internalPeerConnection.connectionState !== 'closed') {
+                oldPeerConnection._internalPeerConnection.close();
             }
 
             // create & set the new peer connection in our list
             const peerConnection = new RTCPeerConnection(rtcConfig);
-            this._peerConnections.set(remoteClientId, peerConnection);
+            const peerWrapper = new RTCPeerWrapper(peerConnection, this, remoteClientId);
+            this._peerConnections.set(remoteClientId, peerWrapper);
 
             const answerer = new Answerer(
                 rtcConfig,
@@ -109,40 +111,8 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
             // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
             // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            peerConnection.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
-                if (candidate) {
-                    signalingClient?.sendIceCandidate(candidate);
-                } else {
-                    console.debug(`No more ICE candidates will be generated for peer "${remoteClientId}"...`);
-                }
-            });
-
-            peerConnection.addEventListener('connectionstatechange', () => {
-                console.log('[VIEWER] Peer connection state changed:', peerConnection.connectionState);
-            });
-
-            peerConnection.addEventListener('negotiationneeded', () => {
-                console.debug(`[MASTER] Negotiation needed for peer "${remoteClientId}"...`);
-                peerConnection.createOffer().then(answer => peerConnection.setLocalDescription(answer))
-                    .then(() => {
-                        if (peerConnection.localDescription) {
-                            signalingClient.sendSdpOffer(peerConnection.localDescription);
-                            console.debug(`[MASTER] Negotiation answer sent for peer "${remoteClientId}"...`);
-                        }
-                        else {
-                            console.error('[MASTER] No local description to send for peer "${remoteClientId}"...');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[MASTER] Error sending negotiation answer for peer "${remoteClientId}":', error);
-                    });
-            });
-
-            console.log(`[MASTER] Peer ${remoteClientId} connected!`);
-
             // let our user handle the rest.
-            this._callbacks.onPeerConnected?.(peerConnection, remoteClientId);
+            this._callbacks.onPeerConnected?.(peerWrapper);
         });
 
         signalingClient.on('sdpAnswer', async answer => {
