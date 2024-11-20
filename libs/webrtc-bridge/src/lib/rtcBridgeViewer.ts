@@ -125,8 +125,8 @@ export class RTCBridgeViewer extends RTCBridgeBase {
         });
 
         signalingClient.on('sdpOffer', async (offer: RTCSessionDescription) => {
-            console.error("SDP Offer received...we shouldn't be getting this in the user client.", offer);
-            this._callbacks.onSignalingError?.(offer);
+            console.log("SDP Offer received--due to negotiation needed:", offer);
+            
         });
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
@@ -143,6 +143,18 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             else {
                 console.error("No peer connection to send to user upon SDP Answer...this shouldn't happen.");
             }
+
+            this._peerConnection?.addEventListener('negotiationneeded', () => {
+                console.log('[VIEWER] Negotiation needed...sending offer...');
+                this._peerConnection?.createOffer().then(answer => this._peerConnection?.setLocalDescription(answer));
+                if (this._peerConnection?.localDescription) {
+                    console.log('[VIEWER] Sending SDP answer with local description:', this._peerConnection.localDescription);
+                    signalingClient.sendSdpAnswer(this._peerConnection.localDescription);
+                }
+                else {
+                    console.error('[VIEWER] No local description to send to lab client upon SDP Answer...this shouldn\'t happen.');
+                }
+            });
         });
 
         signalingClient.on('close', () => {

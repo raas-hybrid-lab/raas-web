@@ -81,6 +81,7 @@ class RobotsManager {
             await this.connectRobot(VideoChatDriver);
             driver = this.driversById.values().next().value;
         }
+        // wait for 5 seconds
         driver?.connectUser(connection);
     }
 

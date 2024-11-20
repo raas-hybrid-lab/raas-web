@@ -119,7 +119,24 @@ export class RTCBridgeMaster extends RTCBridgeBase {
             });
 
             peerConnection.addEventListener('connectionstatechange', () => {
-                console.debug('[VIEWER] Peer connection state changed:', peerConnection.connectionState);
+                console.log('[VIEWER] Peer connection state changed:', peerConnection.connectionState);
+            });
+
+            peerConnection.addEventListener('negotiationneeded', () => {
+                console.debug(`[MASTER] Negotiation needed for peer "${remoteClientId}"...`);
+                peerConnection.createOffer().then(answer => peerConnection.setLocalDescription(answer))
+                    .then(() => {
+                        if (peerConnection.localDescription) {
+                            signalingClient.sendSdpOffer(peerConnection.localDescription);
+                            console.debug(`[MASTER] Negotiation answer sent for peer "${remoteClientId}"...`);
+                        }
+                        else {
+                            console.error('[MASTER] No local description to send for peer "${remoteClientId}"...');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('[MASTER] Error sending negotiation answer for peer "${remoteClientId}":', error);
+                    });
             });
 
             console.log(`[MASTER] Peer ${remoteClientId} connected!`);

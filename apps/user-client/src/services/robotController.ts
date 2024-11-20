@@ -28,6 +28,12 @@ export class RobotController {
             const stream = event.streams[0];
             this._roomMonitorStream = stream;
         }
+        else {
+            if (!this._roomMonitorStream) {
+                this._roomMonitorStream = new MediaStream();
+            }
+            this._roomMonitorStream.addTrack(event.track);
+        }
     }
 
     get roomMonitorStream(): MediaStream | undefined {

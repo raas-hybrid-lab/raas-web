@@ -24,6 +24,7 @@ export class RobotChannelManager {
         // if it's an AV stream channel, add tracks & send metadata about them
         if (channel instanceof RobotAVStreamChannel) {
             for (const track of channel.stream.getTracks()) {
+                console.debug(`Adding track to peer:`, track);
                 this.peer.addTrack(track, channel.stream);
             }
             this._sendMetadata(channel.stream);
