@@ -9,11 +9,11 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { RTCBridgeBase } from './rtcBridgeBase';
+import { RTCSignalingBase } from './rtcBridgeBase';
 import { v4 as uuid } from 'uuid';
 
 
-export type RTCBridgeViewerCallbacks = {
+export type RTCSignalingViewerCallbacks = {
     onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error | object) => void,
@@ -36,20 +36,20 @@ type SignalingClientStatusResponse = {
     statusResponse: StatusResponseInner;
 };
 
-export class RTCBridgeViewer extends RTCBridgeBase {
+export class RTCSignalingViewer extends RTCSignalingBase {
     /**
      * Singleton class for managing the RTC connection with the lab client.
      */
 
-    private static singleton: RTCBridgeViewer | undefined;
-    private _callbacks: RTCBridgeViewerCallbacks
+    private static singleton: RTCSignalingViewer | undefined;
+    private _callbacks: RTCSignalingViewerCallbacks
     private _peerConnection: RTCPeerConnection | undefined;
 
     private constructor(
-        callbacks: RTCBridgeViewerCallbacks,
+        callbacks: RTCSignalingViewerCallbacks,
     ) {
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        const clientId = RTCBridgeViewer.generateClientId();
+        const clientId = RTCSignalingViewer.generateClientId();
 
         super(
             channelName,
@@ -61,9 +61,9 @@ export class RTCBridgeViewer extends RTCBridgeBase {
         this._peerConnection = undefined;
     }
 
-    public static async getInstance(callbacks: RTCBridgeViewerCallbacks): Promise<RTCBridgeViewer> {
+    public static async getInstance(callbacks: RTCSignalingViewerCallbacks): Promise<RTCSignalingViewer> {
         if (!this.singleton) {
-            this.singleton = new RTCBridgeViewer(callbacks);
+            this.singleton = new RTCSignalingViewer(callbacks);
         }
         else {
             console.warn("RTCBridgeViewer singleton already exists. Returning existing instance & setting new callbacks.");
@@ -75,7 +75,7 @@ export class RTCBridgeViewer extends RTCBridgeBase {
     override cleanup(): void {
         super.cleanup();
         this._callbacks.onSignalingDisconnect?.();
-        RTCBridgeViewer.singleton = undefined;
+        RTCSignalingViewer.singleton = undefined;
     }
 
     get peerConnection(): RTCPeerConnection | undefined {
@@ -188,4 +188,4 @@ export class RTCBridgeViewer extends RTCBridgeBase {
 
 }
 
-export default RTCBridgeViewer;
+export default RTCSignalingViewer;

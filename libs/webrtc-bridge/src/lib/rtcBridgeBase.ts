@@ -6,7 +6,7 @@ import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
 /**
  * Base class for RTCBridgeMaster and RTCBridgeViewer.
  */
-export abstract class RTCBridgeBase {
+export abstract class RTCSignalingBase {
     protected _channelHelper: ChannelHelper;
     protected readonly _clientConfig: AWSClientArgs;
     protected readonly _loggingPrefix: string;

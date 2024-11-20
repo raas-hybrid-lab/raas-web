@@ -1,4 +1,4 @@
-import { RTCBridgeMaster } from '@raas-web/webrtc-bridge';
+import { RTCSignalingMaster } from '@raas-web/webrtc-bridge';
 import { RobotDriver } from './robotDriverBase';
 import { VideoChatDriver } from './drivers/videoChatDriver';
 import { v4 as uuid } from 'uuid';
@@ -38,14 +38,14 @@ class RobotsManager {
      */
     private static singleton: RobotsManager | undefined;
 
-    private rtc: RTCBridgeMaster;
+    private rtc: RTCSignalingMaster;
     private driversById: Map<string, RobotDriver>;
     private callbacks: RobotsManagerCallbacks;
     /*
         Constructor for RobotsManager.
         @param rtcMaster - The RTCBridgeMaster instance to use for managing connections. Must be initialized.
      */
-    constructor(rtcMaster: RTCBridgeMaster, callbacks: RobotsManagerCallbacks) {
+    constructor(rtcMaster: RTCSignalingMaster, callbacks: RobotsManagerCallbacks) {
         this.rtc = rtcMaster;
         this.driversById = new Map();
         this.callbacks = callbacks;
@@ -54,7 +54,7 @@ class RobotsManager {
     public static async getInstance(callbacks: RobotsManagerCallbacks): Promise<RobotsManager> {
         if (!RobotsManager.singleton) {
             // todo add real callbacks for errors
-            RobotsManager.singleton = new RobotsManager(await RTCBridgeMaster.getInstance({
+            RobotsManager.singleton = new RobotsManager(await RTCSignalingMaster.getInstance({
                 onPeerConnected: (connection: RTCPeerConnection, peerId: string) => RobotsManager.singleton?.onPeerConnected(connection, peerId),
                 onSignalingDisconnect: () => { throw new Error("signaling disconnected"); },
                 onSignalingError: (error: Error) => { throw error; },
@@ -89,7 +89,7 @@ class RobotsManager {
         console.log('Peer disconnected (handling in robots manager):', peerId);
     }
 
-    get rtcMaster(): RTCBridgeMaster {
+    get rtcMaster(): RTCSignalingMaster {
         return this.rtc;
     }
 

@@ -9,28 +9,28 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { RTCBridgeBase } from './rtcBridgeBase';
+import { RTCSignalingBase } from './rtcBridgeBase';
 import { Answerer } from './answerer';
 
-export type RTCBridgeMasterCallbacks = {
+export type RTCSignalingMasterCallbacks = {
     onPeerConnected?: (peerConnection: RTCPeerConnection, clientId: string) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error) => void,
 }
 
-export class RTCBridgeMaster extends RTCBridgeBase {
+export class RTCSignalingMaster extends RTCSignalingBase {
     /**
      * Singleton class for managing RTC connections with user clients.
      */
 
-    private static singleton: RTCBridgeMaster | undefined;
-    private _callbacks: RTCBridgeMasterCallbacks
+    private static singleton: RTCSignalingMaster | undefined;
+    private _callbacks: RTCSignalingMasterCallbacks
 
     // Map of clientId to peerConnection
     private _peerConnections: Map<string, RTCPeerConnection>;
 
     private constructor(
-        callbacks: RTCBridgeMasterCallbacks,
+        callbacks: RTCSignalingMasterCallbacks,
     ) {
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
         super(
@@ -43,9 +43,9 @@ export class RTCBridgeMaster extends RTCBridgeBase {
         this._peerConnections = new Map<string, RTCPeerConnection>();
     }
 
-    public static async getInstance(callbacks: RTCBridgeMasterCallbacks): Promise<RTCBridgeMaster> {
+    public static async getInstance(callbacks: RTCSignalingMasterCallbacks): Promise<RTCSignalingMaster> {
         if (!this.singleton) {
-            this.singleton = new RTCBridgeMaster(callbacks);
+            this.singleton = new RTCSignalingMaster(callbacks);
         }
         else {
             console.warn("RTCBridgeMaster singleton already exists. Returning existing instance & setting new callbacks.");
@@ -59,7 +59,7 @@ export class RTCBridgeMaster extends RTCBridgeBase {
         this._peerConnections.forEach(peerConnection => peerConnection.close());
         this._peerConnections.clear();
         this._callbacks.onSignalingDisconnect?.();
-        RTCBridgeMaster.singleton = undefined;
+        RTCSignalingMaster.singleton = undefined;
     }
 
     protected override async _registerSignalingClientCallbacks(
@@ -174,4 +174,4 @@ export class RTCBridgeMaster extends RTCBridgeBase {
     }
 }
 
-export default RTCBridgeMaster;
+export default RTCSignalingMaster;
