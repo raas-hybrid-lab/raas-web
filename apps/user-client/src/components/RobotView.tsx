@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Stack } from '@mui/material';
 import CommandBox from './CommandBox';
 import VideoView from './VideoView';
@@ -7,6 +7,21 @@ import { RobotController } from '../services/robotController';
 
 const RobotView: React.FC<{ robotController: RobotController }> = ({ robotController }) => {
   const [telemetryHistory, setTelemetryHistory] = useState<string[]>([]);
+  const [stream, setStream] = useState(robotController.roomMonitorStream);
+
+  useEffect(() => {
+    const updateStream = () => {
+      setStream(robotController.roomMonitorStream);
+    };
+
+    robotController.setCallbacks({
+      onChannelsChanged: updateStream
+    });
+
+    return () => {
+      // no-op
+    };
+  }, [robotController]);
 
   const handleCommandSubmit = (command: string) => {
     // just for easy testing, display the last-entered command in telemetry
@@ -18,7 +33,7 @@ const RobotView: React.FC<{ robotController: RobotController }> = ({ robotContro
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <VideoView title="Room Monitor" stream={robotController.roomMonitorStream} />
+          <VideoView title="Room Monitor" stream={stream} />
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <Box sx={{ flex: 1 }}>

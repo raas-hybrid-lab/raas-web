@@ -18,7 +18,7 @@ function App() {
 
   const { bridge, loading, error } = useRTCBridgeViewer({
     onMasterConnected(peerConnection) {
-      const robotController = new RobotController(peerConnection);
+      const robotController = new RobotController(peerConnection, {});
       setRobotController(robotController);
     },
   });

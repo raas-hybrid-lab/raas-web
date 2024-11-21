@@ -13,8 +13,15 @@ import { PeerMetadataChannel } from './metadataChannel';
  * RTCPeerWrapper is a wrapper class for RTCPeerConnection. 
  * It is signaling client agnostic and provides a simplified interface to RTCPeerConnection.
  * 
- * It is created by the signaling client (RTCBridgeMaster or RTCBridgeViewer) and handles
+ * It is created by the signaling client (RTCSignalingMaster or RTCSignalingViewer) and handles
  * all callbacks etc for the RTCPeerConnection instance once it's created.
+ * 
+ * In this class, we operate at the level of streams, not tracks alone.
+ * 
+ * Events:  
+ * - metadataChannelOpened: Emitted when the metadata channel is opened. Primarily for internal use.
+ * - remoteStreamAdded: Emitted when a stream is added by the remote peer.
+ * - localStreamAdded: Emitted when a stream is added by us (useful when one component adds the stream and another needs to know about it).
  */
 export class RTCPeerWrapper extends EventEmitter {
     private _peer: RTCPeerConnection;
@@ -25,6 +32,14 @@ export class RTCPeerWrapper extends EventEmitter {
     private _dataChannels: Map<string, RTCDataChannel> = new Map();
     private _streams: Map<string, MediaStream> = new Map();
 
+    /**
+     * 
+     * @param peer - The RTCPeerConnection instance to wrap.
+     * @param signalingClient - The signaling client that created this peer wrapper.
+     * @param remoteClientId - The ID of the remote client this peer will connected to.
+     * @param sendInitialOffer - Whether to send the initial offer to the remote client. This is managed
+     * by this class because it needs to set up the metadata channel first.
+     */
     constructor(peer: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined, sendInitialOffer = false) {
         super();
         this._peer = peer;
@@ -47,28 +62,51 @@ export class RTCPeerWrapper extends EventEmitter {
         }
 
         // set up some key callbacks for the peer connection
-        peer.addEventListener('icecandidate', ({ candidate }) => {
+        peer.onicecandidate = ({ candidate }) => {
             // console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
             if (candidate) {
                 signalingClient?.sendIceCandidate(candidate);
             } else {
                 console.debug(`No more ICE candidates will be generated for peer "${remoteClientId}"...`);
             }
-        });
+        };
 
-        peer.addEventListener('connectionstatechange', () => {
+        peer.onconnectionstatechange = () => {
             console.log(`[PEER] Peer connection state changed for peer "${remoteClientId}":`, peer.connectionState);
-        });
+        };
 
-        peer.addEventListener('signalingstatechange', () => {
+        peer.onsignalingstatechange = () => {
             console.log(`[PEER] Peer signaling state changed for peer "${remoteClientId}":`, peer.signalingState);
-        });
+        };
 
-        peer.addEventListener('track', (event) => {
+        peer.ontrack = (event: RTCTrackEvent) => {
             console.log('[PEER] Track event:', event);
-        });
+            if (event.streams.length > 0) {
+                event.streams.forEach(stream => {
+                    // todo: get a label for the stream from the other peer
+                    // can do this from the metadata channel.
+                    // this will help us to label the video element on the UI with helpful 
+                    // names like "front facing camera" or "microphone" etc.
+                    if (this._streams.has(stream.id)) {
+                        // if the stream already exists, just add the track to it
+                        // tbd if we need an event for this--for now, let's try and stick to streams as our fundamental unit
+                        // to expose to the outside world.
+                        this._streams.get(stream.id)?.addTrack(event.track);
+                    } else {
+                        this._streams.set(stream.id, stream);
+                        this.emit('remoteStreamAdded', stream);
+                    }
+                });
+            } else {
+                console.debug('[PEER] Track event received with no streams; creating a new stream:', event);
+                const stream = new MediaStream();
+                stream.addTrack(event.track);
+                this._streams.set(stream.id, stream);
+                this.emit('remoteStreamAdded', stream);
+            }
+        };
 
-        peer.addEventListener('datachannel', (event: RTCDataChannelEvent) => {
+        peer.ondatachannel = (event: RTCDataChannelEvent) => {
             console.log('[PEER] datachannel event:', event);
             if (event.channel.label === 'metadata') {
                 this._metadataChannel = new PeerMetadataChannel(
@@ -82,11 +120,11 @@ export class RTCPeerWrapper extends EventEmitter {
             } else {
                 this._dataChannels.set(event.channel.label, event.channel);
             }
-        });
+        };
 
-        peer.addEventListener('negotiationneeded', () => {
+        peer.onnegotiationneeded = () => {
             this._onNegotiationNeeded();
-        });
+        };
         console.log(`[PEER] Peer "${remoteClientId}" connected!`);
     }
 
@@ -203,6 +241,9 @@ export class RTCPeerWrapper extends EventEmitter {
      */
     public addStream(stream: MediaStream, label: string) {
         console.debug(`[PEER] Adding stream ${label} to peer "${this._remoteClientId}"...`, stream);
+        if (this._streams.has(label)) {
+            console.warn(`[PEER] Stream ${label} already exists; overwriting.`);
+        }
         this._streams.set(label, stream);
 
         // todo figure out how to get the label to the other peer
@@ -210,6 +251,8 @@ export class RTCPeerWrapper extends EventEmitter {
         for (const track of stream.getTracks()) {
             this._peer.addTrack(track, stream);
         }
+
+        this.emit('localStreamAdded', stream);
     }
 
     /**

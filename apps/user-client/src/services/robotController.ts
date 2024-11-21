@@ -1,4 +1,8 @@
+import { RTCPeerWrapper } from "@raas-web/webrtc-bridge";
 
+export type RobotControllerCallbacks = {
+    onChannelsChanged?: () => void;
+}
 
 export class RobotController {
     /*
@@ -6,38 +10,33 @@ export class RobotController {
 
         Currently is basically just for a quick demo of the video streaming.
      */
-
-    private peer: RTCPeerConnection;
-
+    private _callbacks: RobotControllerCallbacks;
+    private _peer: RTCPeerWrapper;
     private _roomMonitorStream: MediaStream | undefined;
+
     /*
         Constructor for RobotsManager.
         @param rtcMaster - The RTCBridgeMaster instance to use for managing connections. Must be initialized.
      */
-    constructor(peer: RTCPeerConnection) {
-        this.peer = peer;
+    constructor(peer: RTCPeerWrapper, callbacks: RobotControllerCallbacks) {
+        this._peer = peer;
+        this._callbacks = callbacks;
 
-        this.peer.ontrack = this.onTrack;
+        this._peer.on('remoteStreamAdded', this.onRemoteStreamAdded.bind(this));
     }
 
-    private onTrack(event: RTCTrackEvent) {
-        console.log('Track event:', event);
-
-        if (event.streams.length > 0) {
-            // we're only ever going to send one stream per track
-            const stream = event.streams[0];
-            this._roomMonitorStream = stream;
-        }
-        else {
-            if (!this._roomMonitorStream) {
-                this._roomMonitorStream = new MediaStream();
-            }
-            this._roomMonitorStream.addTrack(event.track);
-        }
+    private onRemoteStreamAdded(stream: MediaStream) {
+        console.log('Remote stream added:', stream);
+        this._roomMonitorStream = stream;
+        this._callbacks.onChannelsChanged?.();
     }
 
+    public setCallbacks(callbacks: RobotControllerCallbacks) {
+        this._callbacks = callbacks;
+    }
+
+    // temporary easy way to expose this stream.
     get roomMonitorStream(): MediaStream | undefined {
         return this._roomMonitorStream;
     }
-
 }
