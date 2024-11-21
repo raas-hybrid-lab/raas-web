@@ -56,7 +56,7 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
     override cleanup(): void {
         super.cleanup();
-        this._peerConnections.forEach(peerConnection => peerConnection._internalPeerConnection.close());
+        this._peerConnections.forEach(peerConnection => peerConnection.close());
         this._peerConnections.clear();
         this._callbacks.onSignalingDisconnect?.();
         RTCSignalingMaster.singleton = undefined;
@@ -82,8 +82,8 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
             // Close any previous peer connection, in case a peer with the same clientId sends another connection
             const oldPeerConnection = this._peerConnections.get(remoteClientId);
-            if (oldPeerConnection && oldPeerConnection._internalPeerConnection.connectionState !== 'closed') {
-                oldPeerConnection._internalPeerConnection.close();
+            if (oldPeerConnection) {
+                oldPeerConnection.close();
             }
 
             // create & set the new peer connection in our list

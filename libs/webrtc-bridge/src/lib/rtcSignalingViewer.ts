@@ -93,24 +93,10 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
             // create a peer connection and send an offer to the lab client.
             this._peerConnection = new RTCPeerWrapper(new RTCPeerConnection(rtcConfig), this, undefined, true);
-            const offer = await this._peerConnection._internalPeerConnection.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
-            });
-            await this._peerConnection._internalPeerConnection.setLocalDescription(offer);
-            if (this._peerConnection._internalPeerConnection.localDescription) {
-                console.debug('[VIEWER] Sending SDP offer with local description:', this._peerConnection._internalPeerConnection.localDescription);
-                signalingClient.sendSdpOffer(this._peerConnection._internalPeerConnection.localDescription);
-            }
-            else {
-                // unsure why this would happen, but typing indicates it's possible
-                throw new Error("No local description to send to lab client.");
-            }
-            console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
         });
 
         const addIceCandidate = async (candidate: RTCIceCandidate) => {
-            this._peerConnection?._internalPeerConnection.addIceCandidate(candidate);
+            await this._peerConnection?.addIceCandidate(candidate);
         };
 
         signalingClient.on('iceCandidate', addIceCandidate);
@@ -127,7 +113,7 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
             // let our user handle the rest.
             if (this._peerConnection) {
-                await this._peerConnection._internalPeerConnection.setRemoteDescription(answer);
+                await this._peerConnection.setRemoteDescription(answer);
                 await this._peerConnection.awaitReadyToNegotiate();
                 console.log('[VIEWER] Connected to lab client!');
                 this._callbacks.onMasterConnected?.(this._peerConnection);

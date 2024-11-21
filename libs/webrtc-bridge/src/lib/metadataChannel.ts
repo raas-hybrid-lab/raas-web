@@ -74,4 +74,8 @@ export class PeerMetadataChannel extends EventEmitter {
             message: "helloworld",
         }));
     }
+
+    public close() {
+        this._channel.close();
+    }
 }
