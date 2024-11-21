@@ -22,6 +22,8 @@ import { PeerMetadataChannel } from './metadataChannel';
  * - metadataChannelOpened: Emitted when the metadata channel is opened. Primarily for internal use.
  * - remoteStreamAdded: Emitted when a stream is added by the remote peer.
  * - localStreamAdded: Emitted when a stream is added by us (useful when one component adds the stream and another needs to know about it).
+ * - remoteDataChannelOpened: Emitted when a data channel is opened by the remote peer.
+ * - localDataChannelOpened: Emitted when a data channel is opened by us (useful when one component opens the data channel and another needs to know about it).
  */
 export class RTCPeerWrapper extends EventEmitter {
     private _peer: RTCPeerConnection;
@@ -119,6 +121,7 @@ export class RTCPeerWrapper extends EventEmitter {
                 this.emit('metadataChannelOpened');
             } else {
                 this._dataChannels.set(event.channel.label, event.channel);
+                this.emit('remoteDataChannelOpened', event.channel);
             }
         };
 
@@ -261,9 +264,10 @@ export class RTCPeerWrapper extends EventEmitter {
      * @param label - The label of the data channel.
      * @returns The data channel.
      */
-    public addDataChannel(label: string): RTCDataChannel {
+    public createDataChannel(label: string): RTCDataChannel {
         const dataChannel = this._peer.createDataChannel(label);
         this._dataChannels.set(label, dataChannel);
+        this.emit('localDataChannelOpened', dataChannel);
         return dataChannel;
     }
 

@@ -15,18 +15,19 @@ const RobotView: React.FC<{ robotController: RobotController }> = ({ robotContro
     };
 
     robotController.setCallbacks({
-      onChannelsChanged: updateStream
+      onChannelsChanged: updateStream,
+      onTelemetryMessage: (message: string) => {
+        setTelemetryHistory([...telemetryHistory, message]);
+      }
     });
 
     return () => {
       // no-op
     };
-  }, [robotController]);
+  }, [robotController, telemetryHistory]);
 
   const handleCommandSubmit = (command: string) => {
-    // just for easy testing, display the last-entered command in telemetry
-    // TODO: actually send the command to the robot here
-    setTelemetryHistory([...telemetryHistory, command]);
+    robotController.sendTelemetryEcho(command);
   };
 
   return (
