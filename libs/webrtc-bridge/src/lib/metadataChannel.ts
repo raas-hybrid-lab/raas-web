@@ -31,10 +31,15 @@ export class PeerMetadataChannel {
                 case 'sdpAnswer':
                     this._callbacks.onSdpAnswer(message.sdpAnswer);
                     break;
+                case 'test':
+                    console.log('[METADATA] Received test message:', message.message);
+                    break;
                 default:
                     console.error('[METADATA] Received unknown message type:', message.type);
             }
         };
+
+        this._sendTestMessage();
     }
 
     private _send(message: string) {
@@ -52,6 +57,13 @@ export class PeerMetadataChannel {
         this._send(JSON.stringify({
             type: 'sdpAnswer',
             sdpAnswer: answer,
+        }));
+    }
+
+    private _sendTestMessage() {
+        this._send(JSON.stringify({
+            type: 'test',
+            message: "helloworld",
         }));
     }
 }
