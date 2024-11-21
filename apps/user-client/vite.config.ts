@@ -27,6 +27,7 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+    sourcemap: true,
   },
   define: {
     // had to add this to make the kinesis webrtc sdk work with vite.
