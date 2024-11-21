@@ -4,6 +4,7 @@
  */
 
 import type { RTCSignalingBase } from './rtcSignalingBase';
+import { PeerMetadataChannel } from './metadataChannel';
 
 
 /**
@@ -18,7 +19,7 @@ export class RTCPeerWrapper {
     private _signalingClient: RTCSignalingBase;
     private _remoteClientId: string | undefined;
 
-    private _metadataChannel: RTCDataChannel | undefined;
+    private _metadataChannel: PeerMetadataChannel | undefined;
     private _dataChannels: Map<string, RTCDataChannel> = new Map();
     private _streams: Map<string, MediaStream> = new Map();
 
@@ -30,13 +31,13 @@ export class RTCPeerWrapper {
 
         if (createMetadataChannel) {
             // if not, we'll expect one to come in via the datachannel event
-            this._metadataChannel = this._peer.createDataChannel('metadata');
-            this._metadataChannel.onopen = () => {
-                console.log('[PEER] Metadata channel opened.');
-
-                this._metadataChannel?.send('hello');
+            const metadata = this._peer.createDataChannel('metadata');
+            metadata.onopen = () => {
+                this._metadataChannel = new PeerMetadataChannel(metadata, { 
+                    onSdpOffer: this._onNegotiationRequested, 
+                    onSdpAnswer: this._onNegotiationAnswer 
+                });
             };
-            console.log('[PEER] Created metadata channel.');
         }
 
         // set up some key callbacks for the peer connection
@@ -64,7 +65,13 @@ export class RTCPeerWrapper {
         peer.addEventListener('datachannel', (event: RTCDataChannelEvent) => {
             console.log('[PEER] datachannel event:', event);
             if (event.channel.label === 'metadata') {
-                this._metadataChannel = event.channel;
+                this._metadataChannel = new PeerMetadataChannel(
+                    event.channel, 
+                    { 
+                        onSdpOffer: this._onNegotiationRequested, 
+                        onSdpAnswer: this._onNegotiationAnswer 
+                    }
+                );
             } else {
                 this._dataChannels.set(event.channel.label, event.channel);
             }
@@ -78,8 +85,42 @@ export class RTCPeerWrapper {
 
     private async _onNegotiationNeeded() {
         console.debug(`[PEER] Negotiation needed for peer "${this._remoteClientId}"...`);
-        console.warn(`[PEER] Renegotiation is not yet supported.`);
-        // TODO send offer using the metadata channel--aws signaling channel doesn't support renegotiation
+        if (!this._metadataChannel) {
+            console.log("skipping initial negotiation--waiting for metadata channel.");
+            return;
+        }
+        const offer = await this._internalPeerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+        });
+
+        await this._internalPeerConnection.setLocalDescription(offer);
+        if (this._internalPeerConnection.localDescription) {
+            this._metadataChannel.sendSDPOffer(this._internalPeerConnection.localDescription);
+        }
+        else {
+            console.error("No local description to send to peer.");
+        }
+    }
+
+    private async _onNegotiationRequested(offer: RTCSessionDescription) {
+        console.debug(`[PEER] Connection renegotiation requested by peer "${this._remoteClientId}"...`, offer);
+        console.debug('[PEER] Creating SDP answer for', this._remoteClientId);
+        const answer = await this._internalPeerConnection.createAnswer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+        });
+        await this._internalPeerConnection.setLocalDescription(answer);
+
+        console.debug(`[PEER] Sending SDP answer to ${this._remoteClientId}: `, this._internalPeerConnection.localDescription);
+        if (this._metadataChannel && this._internalPeerConnection.localDescription) {
+            this._metadataChannel.sendSDPAnswer(this._internalPeerConnection.localDescription);
+        }
+    }
+
+    private async _onNegotiationAnswer(answer: RTCSessionDescription) {
+        console.debug(`[PEER] Connection renegotiation answer received from peer "${this._remoteClientId}"...`, answer);
+        await this._internalPeerConnection.setRemoteDescription(answer);
     }
 
     get peerId(): string | undefined {
@@ -117,8 +158,9 @@ export class RTCPeerWrapper {
      * @param label - The label of the data channel.
      * @returns The data channel.
      */
-    public addDataChannel(label: string): void {
+    public addDataChannel(label: string): RTCDataChannel {
         const dataChannel = this._peer.createDataChannel(label);
         this._dataChannels.set(label, dataChannel);
+        return dataChannel;
     }
 }
