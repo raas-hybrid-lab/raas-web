@@ -107,9 +107,13 @@ export class RTCSignalingViewer extends RTCSignalingBase {
                 throw new Error("No local description to send to lab client.");
             }
             console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
-
-
         });
+
+        const addIceCandidate = async (candidate: RTCIceCandidate) => {
+            this._peerConnection?._internalPeerConnection.addIceCandidate(candidate);
+        };
+
+        signalingClient.on('iceCandidate', addIceCandidate);
 
         signalingClient.on('sdpOffer', async (offer: RTCSessionDescription) => {
             console.log("SDP Offer received--due to negotiation needed:", offer);

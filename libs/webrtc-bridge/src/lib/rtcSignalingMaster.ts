@@ -10,7 +10,6 @@
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
 import { RTCSignalingBase } from './rtcSignalingBase';
-import { Answerer } from './answerer';
 
 import { RTCPeerWrapper } from './rtcPeerWrapper';
 
@@ -92,36 +91,18 @@ export class RTCSignalingMaster extends RTCSignalingBase {
             const peerWrapper = new RTCPeerWrapper(peerConnection, this, remoteClientId);
             this._peerConnections.set(remoteClientId, peerWrapper);
 
-            const addIceCandidate = async (candidate: any, candidateClientId: string) => {
+            const addIceCandidate = async (candidate: RTCIceCandidate, candidateClientId: string) => {
                 if (remoteClientId !== candidateClientId) {
-                    // All ICE candidates received over signaling will be received via this callback.
                     // Ignore ICE candidates not directed for this PeerConnection (when multiple
                     // viewer participants are connecting to the same signaling channel).
                     return;
                 }
-
-                // console.debug(this._loggingPrefix, `Received ICE candidate from ${remoteClientId || 'remote'}`);
-                // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
 
                 // Add the ICE candidate received from the client to the peer connection
                 peerConnection.addIceCandidate(candidate);
             };
 
             signalingClient.on('iceCandidate', addIceCandidate);
-
-            peerConnection.addEventListener('icecandidate', ({ candidate }) => {
-                // `candidate` will be the empty string if the event indicates that there are no further candidates
-                // to come in this generation, or null if all ICE gathering on all transports is complete.
-                // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
-                if (candidate) {
-                    // console.debug(this._loggingPrefix, 'Generated ICE candidate for', remoteClientId);
-                    // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
-
-                    signalingClient.sendIceCandidate(candidate, remoteClientId);
-                } else {
-                    console.debug(this._loggingPrefix, 'All ICE candidates have been generated for', remoteClientId);
-                }
-            });
 
             await peerConnection.setRemoteDescription(offer);
 
