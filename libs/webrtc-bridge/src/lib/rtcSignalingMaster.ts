@@ -92,29 +92,54 @@ export class RTCSignalingMaster extends RTCSignalingBase {
             const peerWrapper = new RTCPeerWrapper(peerConnection, this, remoteClientId);
             this._peerConnections.set(remoteClientId, peerWrapper);
 
-            const answerer = new Answerer(
-                rtcConfig,
-                null,
-                offer,
-                remoteClientId,
-                signalingClient,
-                true,
-                true,
-                this._loggingPrefix,
-                () => true,
-                () => true,
-                undefined,
-                (message) => { 
-                    console.log(`[MASTER] Data channel message received from peer "${remoteClientId}"...`, message);
-                },
-            );
-            await answerer.init();
-            console.log(`[MASTER] Answerer initialized for peer "${remoteClientId}"...`);
+            const addIceCandidate = async (candidate: any, candidateClientId: string) => {
+                if (remoteClientId !== candidateClientId) {
+                    // All ICE candidates received over signaling will be received via this callback.
+                    // Ignore ICE candidates not directed for this PeerConnection (when multiple
+                    // viewer participants are connecting to the same signaling channel).
+                    return;
+                }
 
-            // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
-            // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            // let our user handle the rest.
-            this._callbacks.onPeerConnected?.(peerWrapper);
+                // console.debug(this._loggingPrefix, `Received ICE candidate from ${remoteClientId || 'remote'}`);
+                // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+
+                // Add the ICE candidate received from the client to the peer connection
+                peerConnection.addIceCandidate(candidate);
+            };
+
+            signalingClient.on('iceCandidate', addIceCandidate);
+
+            peerConnection.addEventListener('icecandidate', ({ candidate }) => {
+                // `candidate` will be the empty string if the event indicates that there are no further candidates
+                // to come in this generation, or null if all ICE gathering on all transports is complete.
+                // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
+                if (candidate) {
+                    // console.debug(this._loggingPrefix, 'Generated ICE candidate for', remoteClientId);
+                    // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+
+                    signalingClient.sendIceCandidate(candidate, remoteClientId);
+                } else {
+                    console.debug(this._loggingPrefix, 'All ICE candidates have been generated for', remoteClientId);
+                }
+            });
+
+            await peerConnection.setRemoteDescription(offer);
+
+            // Create an SDP answer to send back to the client
+            console.debug(this._loggingPrefix, 'Creating SDP answer for', remoteClientId);
+            await peerConnection.setLocalDescription(
+                await peerConnection.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true,
+                }),
+            );
+
+            console.debug(this._loggingPrefix, 'Sending SDP answer to', remoteClientId);
+            const correlationId = this.generateCorrelationId();
+            console.debug(this._loggingPrefix, 'SDP answer:', peerConnection.localDescription, 'correlationId:', correlationId);
+            if (peerConnection.localDescription) {
+                signalingClient.sendSdpAnswer(peerConnection.localDescription, remoteClientId, correlationId);
+            }
         });
 
         signalingClient.on('sdpAnswer', async answer => {
