@@ -74,8 +74,8 @@ export class RTCPeerWrapper extends EventEmitter {
                 this._metadataChannel = new PeerMetadataChannel(
                     event.channel, 
                     { 
-                        onSdpOffer: this._onNegotiationRequested, 
-                        onSdpAnswer: this._onNegotiationAnswer 
+                        onSdpOffer: this._onNegotiationRequested.bind(this), 
+                        onSdpAnswer: this._onNegotiationAnswer.bind(this) 
                     }
                 );
                 this.emit('metadataChannelOpened');
@@ -164,6 +164,7 @@ export class RTCPeerWrapper extends EventEmitter {
     private async _onNegotiationRequested(offer: RTCSessionDescription) {
         console.debug(`[PEER] Connection renegotiation requested by peer "${this._remoteClientId}"...`, offer);
         console.debug('[PEER] Creating SDP answer for', this._peer);
+        this._peer.setRemoteDescription(offer);
         const answer = await this._peer.createAnswer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true,
