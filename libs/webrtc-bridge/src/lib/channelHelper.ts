@@ -35,17 +35,19 @@ class ChannelHelper {
         this._clientId = clientId;
 
         // Validate required client arguments 
-        if (!this._clientArgs.region) {
-            throw new Error('Region is required');
-        }
-        if (!this._clientArgs.accessKeyId) {
-            throw new Error('Access key ID is required');
-        }
-        if (!this._clientArgs.sessionToken) {
-            throw new Error('Secret access key is required');
-        }
-        if (!this._clientArgs.secretAccessKey) {
-            throw new Error('Secret access key is required');
+        try {
+            if (!this._clientArgs.region) {
+                throw new Error('Region is required');
+            }
+            if (!this._clientArgs.accessKeyId) {
+                throw new Error('Access key ID is required');
+            }
+            if (!this._clientArgs.secretAccessKey) {
+                throw new Error('Secret access key is required');
+            }
+        } catch (error) {
+            console.error('Error in channelHelper constructor:', error);
+            throw error;
         }
     }
 
