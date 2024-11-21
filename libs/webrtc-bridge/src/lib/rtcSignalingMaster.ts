@@ -69,7 +69,7 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
         console.debug("Setting up signaling callbacks...");
         signalingClient.on('open', () => {
-            console.debug("Signaling client opened. We're connected to AWS.");
+            console.log("Signaling client opened. We're connected to AWS.");
             // nothing more to do here--we just have to wait for user clients to send offers to connect.
         });
 

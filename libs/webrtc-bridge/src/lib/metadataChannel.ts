@@ -27,7 +27,7 @@ export class PeerMetadataChannel extends EventEmitter {
         console.debug('[METADATA] Metadata channel opened.');
 
         this._channel.onmessage = (event) => {
-            console.log('[METADATA] Message received:', event.data);
+            console.debug('[METADATA] Message received:', event.data);
             const message = JSON.parse(event.data);
             switch (message.type) {
                 case 'sdpOffer':
@@ -39,7 +39,7 @@ export class PeerMetadataChannel extends EventEmitter {
                 case 'test':
                     // could change to ping pong if i want to test latency be more robust etc
                     // but for now this is easier and good enough.
-                    console.log('[METADATA] Received test message:', message.message);
+                    console.debug('[METADATA] Received test message:', message.message);
                     this.emit('ready');
                     break;
                 default:

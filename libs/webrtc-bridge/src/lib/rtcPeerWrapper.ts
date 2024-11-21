@@ -74,15 +74,15 @@ export class RTCPeerWrapper extends EventEmitter {
         };
 
         peer.onconnectionstatechange = () => {
-            console.log(`[PEER] Peer connection state changed for peer "${remoteClientId}":`, peer.connectionState);
+            console.debug(`[PEER] Peer connection state changed for peer "${remoteClientId}":`, peer.connectionState);
         };
 
         peer.onsignalingstatechange = () => {
-            console.log(`[PEER] Peer signaling state changed for peer "${remoteClientId}":`, peer.signalingState);
+            console.debug(`[PEER] Peer signaling state changed for peer "${remoteClientId}":`, peer.signalingState);
         };
 
         peer.ontrack = (event: RTCTrackEvent) => {
-            console.log('[PEER] Track event:', event);
+            console.debug('[PEER] Track event:', event);
             if (event.streams.length > 0) {
                 event.streams.forEach(stream => {
                     // todo: get a label for the stream from the other peer
@@ -109,7 +109,7 @@ export class RTCPeerWrapper extends EventEmitter {
         };
 
         peer.ondatachannel = (event: RTCDataChannelEvent) => {
-            console.log('[PEER] datachannel event:', event);
+            console.debug('[PEER] datachannel event:', event);
             if (event.channel.label === 'metadata') {
                 this._metadataChannel = new PeerMetadataChannel(
                     event.channel, 
@@ -185,7 +185,7 @@ export class RTCPeerWrapper extends EventEmitter {
     private async _onNegotiationNeeded() {
         console.debug(`[PEER] Negotiation needed for peer "${this._remoteClientId}"...`);
         if (!this._metadataChannel) {
-            console.log("skipping initial negotiation--waiting for metadata channel.");
+            console.debug("skipping initial negotiation--waiting for metadata channel.");
             return;
         }
         const offer = await this._peer.createOffer({
