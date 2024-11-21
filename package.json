@@ -6,7 +6,8 @@
   "private": true,
   "dependencies": {
     "@aws-sdk/client-kinesis-video": "^3.682.0",
-    "@aws-sdk/client-kinesis-video-signaling": "^3.682.0",
+    "@aws-sdk/client-kinesis-video-signaling": "^3.696.0",
+    "@aws-sdk/client-kinesis-video-webrtc-storage": "^3.696.0",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@fontsource/roboto": "^5.1.0",
@@ -14,7 +15,6 @@
     "@mui/material": "^6.1.6",
     "@mui/system": "^6.1.6",
     "amazon-kinesis-video-streams-webrtc": "^2.3.1",
-    "aws-sdk": "^2.1691.0",
     "events": "^3.3.0",
     "mockrtc": "^0.3.2",
     "react": "^18.3.1",
