@@ -99,12 +99,14 @@ export class RTCSignalingMaster extends RTCSignalingBase {
                 remoteClientId,
                 signalingClient,
                 true,
-                false,
+                true,
                 this._loggingPrefix,
                 () => true,
                 () => true,
                 undefined,
-                undefined,
+                (message) => { 
+                    console.log(`[MASTER] Data channel message received from peer "${remoteClientId}"...`, message);
+                },
             );
             await answerer.init();
             console.log(`[MASTER] Answerer initialized for peer "${remoteClientId}"...`);

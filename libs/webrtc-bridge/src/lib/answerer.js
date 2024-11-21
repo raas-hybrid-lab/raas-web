@@ -93,8 +93,8 @@ export class Answerer {
                 return;
             }
 
-            console.debug(this._loggingPrefix, `Received ICE candidate from ${remoteClientId || 'remote'}`);
-            console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+            // console.debug(this._loggingPrefix, `Received ICE candidate from ${remoteClientId || 'remote'}`);
+            // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
 
             if (this._inboundIceCandidateFilterFn(candidate)) {
                 // Add the ICE candidate received from the client to the peer connection
@@ -111,27 +111,27 @@ export class Answerer {
             // to come in this generation, or null if all ICE gathering on all transports is complete.
             // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
             if (candidate) {
-                console.debug(this._loggingPrefix, 'Generated ICE candidate for', this._remoteClientId || 'remote');
-                console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+                // console.debug(this._loggingPrefix, 'Generated ICE candidate for', this._remoteClientId || 'remote');
+                // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
 
                 // When trickle ICE is enabled, send the ICE candidates as they are generated.
                 if (this._trickleICE) {
                     if (this._outboundIceCandidateFilterFn(candidate)) {
-                        console.debug(this._loggingPrefix, 'Sending ICE candidate to', this._remoteClientId || 'remote');
+                        // console.debug(this._loggingPrefix, 'Sending ICE candidate to', this._remoteClientId || 'remote');
                         this._signalingClient.sendIceCandidate(candidate, this._remoteClientId);
                     } else {
-                        console.debug(this._loggingPrefix, 'Not sending ICE candidate to', this._remoteClientId || 'remote');
+                        // console.debug(this._loggingPrefix, 'Not sending ICE candidate to', this._remoteClientId || 'remote');
                     }
                 }
             } else {
-                console.debug(this._loggingPrefix, 'All ICE candidates have been generated for', this._remoteClientId || 'remote');
+                // console.debug(this._loggingPrefix, 'All ICE candidates have been generated for', this._remoteClientId || 'remote');
 
                 // When trickle ICE is disabled, send the answer now that all the ICE candidates have been generated.
                 // NOTE: gathering all the ICE candidates can take a long time. It is recommended to use trickle ICE.
                 if (!this._trickleICE) {
-                    console.debug(this._loggingPrefix, 'Sending SDP answer to', this._remoteClientId || 'remote');
+                    // console.debug(this._loggingPrefix, 'Sending SDP answer to', this._remoteClientId || 'remote');
                     const correlationId = randomString();
-                    console.debug('SDP answer:', this._peerConnection.localDescription, 'correlationId:', correlationId);
+                    // console.debug('SDP answer:', this._peerConnection.localDescription, 'correlationId:', correlationId);
                     this._signalingClient.sendSdpAnswer(this._peerConnection.localDescription, this._remoteClientId, correlationId);
                 }
             }

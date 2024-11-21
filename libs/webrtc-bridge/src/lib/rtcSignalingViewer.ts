@@ -92,15 +92,15 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             console.debug("Signaling client opened. We're connected to AWS. Making offer to lab client...");
 
             // create a peer connection and send an offer to the lab client.
-            const peerConnection = new RTCPeerConnection(rtcConfig);
-            const offer = await peerConnection.createOffer({
+            this._peerConnection = new RTCPeerWrapper(new RTCPeerConnection(rtcConfig), this, undefined, true);
+            const offer = await this._peerConnection._internalPeerConnection.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true,
             });
-            await peerConnection.setLocalDescription(offer);
-            if (peerConnection.localDescription) {
-                console.debug('[VIEWER] Sending SDP offer with local description:', peerConnection.localDescription);
-                signalingClient.sendSdpOffer(peerConnection.localDescription);
+            await this._peerConnection._internalPeerConnection.setLocalDescription(offer);
+            if (this._peerConnection._internalPeerConnection.localDescription) {
+                console.debug('[VIEWER] Sending SDP offer with local description:', this._peerConnection._internalPeerConnection.localDescription);
+                signalingClient.sendSdpOffer(this._peerConnection._internalPeerConnection.localDescription);
             }
             else {
                 // unsure why this would happen, but typing indicates it's possible
@@ -108,7 +108,6 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             }
             console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
 
-            this._peerConnection = new RTCPeerWrapper(peerConnection, this, undefined);
 
         });
 

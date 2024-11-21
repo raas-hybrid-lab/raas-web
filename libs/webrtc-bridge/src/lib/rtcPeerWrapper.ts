@@ -18,18 +18,30 @@ export class RTCPeerWrapper {
     private _signalingClient: RTCSignalingBase;
     private _remoteClientId: string | undefined;
 
+    private _metadataChannel: RTCDataChannel | undefined;
     private _dataChannels: Map<string, RTCDataChannel> = new Map();
     private _streams: Map<string, MediaStream> = new Map();
 
-    constructor(peer: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined) {
+    constructor(peer: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined, createMetadataChannel = false) {
         this._peer = peer;
         this._signalingClient = signalingClient;
         remoteClientId = remoteClientId ?? 'master'; // default to master if no id is provided
         this._remoteClientId = remoteClientId;
 
+        if (createMetadataChannel) {
+            // if not, we'll expect one to come in via the datachannel event
+            this._metadataChannel = this._peer.createDataChannel('metadata');
+            this._metadataChannel.onopen = () => {
+                console.log('[PEER] Metadata channel opened.');
+
+                this._metadataChannel?.send('hello');
+            };
+            console.log('[PEER] Created metadata channel.');
+        }
+
         // set up some key callbacks for the peer connection
         peer.addEventListener('icecandidate', ({ candidate }) => {
-            console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
+            // console.debug(`ICE candidate generated for peer "${remoteClientId}"...`, candidate);
             if (candidate) {
                 signalingClient?.sendIceCandidate(candidate);
             } else {
@@ -49,23 +61,25 @@ export class RTCPeerWrapper {
             console.log('[PEER] Track event:', event);
         });
 
+        peer.addEventListener('datachannel', (event: RTCDataChannelEvent) => {
+            console.log('[PEER] datachannel event:', event);
+            if (event.channel.label === 'metadata') {
+                this._metadataChannel = event.channel;
+            } else {
+                this._dataChannels.set(event.channel.label, event.channel);
+            }
+        });
+
         peer.addEventListener('negotiationneeded', () => {
-            console.debug(`[PEER] Negotiation needed for peer "${remoteClientId}"...`);
-            peer.createOffer().then(answer => peer.setLocalDescription(answer))
-                .then(() => {
-                    if (peer.localDescription) {
-                        signalingClient.sendSdpOffer(peer.localDescription);
-                        console.info(`[PEER] Negotiation offer sent for peer "${remoteClientId}"...`);
-                    }
-                    else {
-                        console.error(`[PEER] No local description to send for peer "${remoteClientId}"...`);
-                    }
-                })
-                .catch(error => {
-                    console.error(`[PEER] Error sending negotiation answer for peer "${remoteClientId}":`, error);
-                });
+            this._onNegotiationNeeded();
         });
         console.log(`[PEER] Peer "${remoteClientId}" connected!`);
+    }
+
+    private async _onNegotiationNeeded() {
+        console.debug(`[PEER] Negotiation needed for peer "${this._remoteClientId}"...`);
+        console.warn(`[PEER] Renegotiation is not yet supported.`);
+        // TODO send offer using the metadata channel--aws signaling channel doesn't support renegotiation
     }
 
     get peerId(): string | undefined {
