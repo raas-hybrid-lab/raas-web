@@ -121,6 +121,10 @@ export class RTCSignalingMaster extends RTCSignalingBase {
             if (peerConnection.localDescription) {
                 signalingClient.sendSdpAnswer(peerConnection.localDescription, remoteClientId, correlationId);
             }
+
+            await peerWrapper.awaitReadyToNegotiate();
+            console.log('RTC Wrapper set up, returning connection for use!')
+            this._callbacks.onPeerConnected?.(peerWrapper);
         });
 
         signalingClient.on('sdpAnswer', async answer => {

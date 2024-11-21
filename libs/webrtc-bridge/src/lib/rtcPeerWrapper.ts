@@ -3,6 +3,8 @@
  * Exposes a simplified interface to RTCPeerConnection.
  */
 
+import { EventEmitter } from 'events';
+
 import type { RTCSignalingBase } from './rtcSignalingBase';
 import { PeerMetadataChannel } from './metadataChannel';
 
@@ -14,7 +16,7 @@ import { PeerMetadataChannel } from './metadataChannel';
  * It is created by the signaling client (RTCBridgeMaster or RTCBridgeViewer) and handles
  * all callbacks etc for the RTCPeerConnection instance once it's created.
  */
-export class RTCPeerWrapper {
+export class RTCPeerWrapper extends EventEmitter {
     private _peer: RTCPeerConnection;
     private _signalingClient: RTCSignalingBase;
     private _remoteClientId: string | undefined;
@@ -24,6 +26,7 @@ export class RTCPeerWrapper {
     private _streams: Map<string, MediaStream> = new Map();
 
     constructor(peer: RTCPeerConnection, signalingClient: RTCSignalingBase, remoteClientId: string | undefined, createMetadataChannel = false) {
+        super();
         this._peer = peer;
         this._signalingClient = signalingClient;
         remoteClientId = remoteClientId ?? 'master'; // default to master if no id is provided
@@ -37,6 +40,7 @@ export class RTCPeerWrapper {
                     onSdpOffer: this._onNegotiationRequested, 
                     onSdpAnswer: this._onNegotiationAnswer 
                 });
+                this.emit('metadataChannelOpened');
             };
         }
 
@@ -72,6 +76,7 @@ export class RTCPeerWrapper {
                         onSdpAnswer: this._onNegotiationAnswer 
                     }
                 );
+                this.emit('metadataChannelOpened');
             } else {
                 this._dataChannels.set(event.channel.label, event.channel);
             }
@@ -81,6 +86,36 @@ export class RTCPeerWrapper {
             this._onNegotiationNeeded();
         });
         console.log(`[PEER] Peer "${remoteClientId}" connected!`);
+    }
+
+    /**
+     * Whether the peer is ready to negotiate.
+     * 
+     * @returns True if the peer is capable of renegotiating the connection to 
+     * include different streams & tracks.
+     */
+    public isReadyToNegotiate(): boolean {
+        return !!this._metadataChannel;
+    }
+
+    /**
+     * Await the peer to be ready to be used for renegotiation.
+     * 
+     * @returns A promise that resolves when the peer is ready to be used for renegotiation.
+     */
+    public async awaitReadyToNegotiate(): Promise<void> {
+        return new Promise((resolve) => {
+            if (this.isReadyToNegotiate()) {
+                resolve();
+            }
+            else {
+                this.once('metadataChannelOpened', () => {
+                    this._metadataChannel?.once('ready', () => {    
+                        resolve();
+                    });
+                });
+            }
+        });
     }
 
     private async _onNegotiationNeeded() {

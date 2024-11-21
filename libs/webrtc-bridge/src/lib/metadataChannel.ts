@@ -1,3 +1,4 @@
+import { EventEmitter } from "events";
 
 
 type MetadataChannelCallbacks = {
@@ -10,16 +11,20 @@ type MetadataChannelCallbacks = {
  * 
  * Currently has one job: to set up renegotiation of the peer connection when new streams are added.
  * (this is a workaroun for the fact that AWS Kinesis Signaling doesn't support renegotiation)
+ * 
+ * Events:
+ * - ready: emitted when the metadata channel is set up on both ends and ready to be used
  */
-export class PeerMetadataChannel {
+export class PeerMetadataChannel extends EventEmitter {
     private _channel: RTCDataChannel;
     private _callbacks: MetadataChannelCallbacks;
 
     constructor(channel: RTCDataChannel, callbacks: MetadataChannelCallbacks) {
+        super();
         this._channel = channel;
         this._callbacks = callbacks;
 
-        console.log('[METADATA] Metadata channel opened.');
+        console.debug('[METADATA] Metadata channel opened.');
 
         this._channel.onmessage = (event) => {
             console.log('[METADATA] Message received:', event.data);
@@ -32,7 +37,10 @@ export class PeerMetadataChannel {
                     this._callbacks.onSdpAnswer(message.sdpAnswer);
                     break;
                 case 'test':
+                    // could change to ping pong if i want to test latency be more robust etc
+                    // but for now this is easier and good enough.
                     console.log('[METADATA] Received test message:', message.message);
+                    this.emit('ready');
                     break;
                 default:
                     console.error('[METADATA] Received unknown message type:', message.type);

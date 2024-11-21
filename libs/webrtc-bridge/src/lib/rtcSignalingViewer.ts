@@ -127,8 +127,9 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
             // let our user handle the rest.
             if (this._peerConnection) {
-                console.log('[VIEWER] Connected to lab client!');
                 await this._peerConnection._internalPeerConnection.setRemoteDescription(answer);
+                await this._peerConnection.awaitReadyToNegotiate();
+                console.log('[VIEWER] Connected to lab client!');
                 this._callbacks.onMasterConnected?.(this._peerConnection);
             }
             else {
