@@ -34,7 +34,7 @@ const RobotView: React.FC<{ robotController: RobotController }> = ({ robotContro
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <VideoView title="Room Monitor" stream={stream} />
+          <VideoView title="Front Camera" stream={stream} />
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <Box sx={{ flex: 1 }}>

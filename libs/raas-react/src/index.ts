@@ -1,2 +1,2 @@
 // export * from './lib/raas-react';
-export * from './lib/hooks/useRTCBridge';
+export * from './lib/hooks/useRTCSignaling';

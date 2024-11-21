@@ -32,7 +32,7 @@ export class VideoChatDriver extends RobotDriver {
         this.telemetryEcho.onmessage = (event) => {
             console.log('Telemetry message:', event.data);
             // echo it back with this driver's id etc
-            this.telemetryEcho?.send(`[Video Chat] ${event.data}`);
+            this.telemetryEcho?.send(`[Robot] ${event.data}`);
         };
     }
 }
