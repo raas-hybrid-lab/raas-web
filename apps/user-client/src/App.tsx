@@ -2,7 +2,10 @@ import "./init";
 import { ThemeProvider, createTheme, CssBaseline, Container, Typography, Button } from '@mui/material';
 // import RobotView from './components/RobotView';
 import './App.css';
-import { useRTCBridgeViewer } from '@raas-web/raas-react';
+import { useRTCSignalingViewer } from '@raas-web/raas-react';
+import RobotView from "./components/RobotView";
+import { RobotController } from "./services/robotController";
+import { useState } from "react";
 
 const theme = createTheme({
   palette: {
@@ -11,13 +14,19 @@ const theme = createTheme({
 });
 
 function App() {
+  const [robotController, setRobotController] = useState<RobotController | undefined>(undefined);
 
-  const { bridge, loading, error } = useRTCBridgeViewer({});
+  const { signaling, loading, error } = useRTCSignalingViewer({
+    onMasterConnected(peerConnection) {
+      const robotController = new RobotController(peerConnection, {});
+      setRobotController(robotController);
+    },
+  });
 
   const handleStartWebRTCViewer = async () => {
     console.log('Starting WebRTC Viewer...');
-    if (bridge) {
-      bridge.start();
+    if (signaling) {
+      signaling.start();
     } else {
       console.error('RTCBridgeViewer not initialized');
     }
@@ -36,13 +45,13 @@ function App() {
           onClick={handleStartWebRTCViewer}
           sx={{ 
             mb: 2,
-            opacity: loading || error || !bridge?.isRunning() ? 0.5 : 1
+            opacity: loading || error || !signaling?.isRunning() ? 0.5 : 1
           }}
-          // disabled={loading || error || !bridge?.isRunning() }
+          disabled={signaling?.isRunning() ?? false}
         >
           Start WebRTC Viewer
         </Button>
-        {/* <RobotView /> */}
+        {robotController && <RobotView robotController={robotController} />}
       </Container>
     </ThemeProvider>
   );

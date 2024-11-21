@@ -1,2 +1,3 @@
-export * from './lib/rtcBridgeMaster';
-export * from './lib/rtcBridgeViewer';
+export * from './lib/rtcSignalingMaster';
+export * from './lib/rtcSignalingViewer';
+export * from './lib/rtcPeerWrapper';

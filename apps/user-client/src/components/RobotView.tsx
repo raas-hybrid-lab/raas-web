@@ -1,24 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Stack } from '@mui/material';
 import CommandBox from './CommandBox';
 import VideoView from './VideoView';
 import TelemetryBox from './TelemetryBox';
+import { RobotController } from '../services/robotController';
 
-const RobotView: React.FC = () => {
+const RobotView: React.FC<{ robotController: RobotController }> = ({ robotController }) => {
   const [telemetryHistory, setTelemetryHistory] = useState<string[]>([]);
+  const [stream, setStream] = useState(robotController.roomMonitorStream);
+
+  useEffect(() => {
+    const updateStream = () => {
+      setStream(robotController.roomMonitorStream);
+    };
+
+    robotController.setCallbacks({
+      onChannelsChanged: updateStream,
+      onTelemetryMessage: (message: string) => {
+        setTelemetryHistory([...telemetryHistory, message]);
+      }
+    });
+
+    return () => {
+      // no-op
+    };
+  }, [robotController, telemetryHistory]);
 
   const handleCommandSubmit = (command: string) => {
-    // just for easy testing, display the last-entered command in telemetry
-    // TODO: actually send the command to the robot here
-    setTelemetryHistory([...telemetryHistory, command]);
+    robotController.sendTelemetryEcho(command);
   };
 
   return (
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <VideoView title="Front Camera" source="webcam" />
-          <VideoView title="Room Monitor" source="webcam" />
+          <VideoView title="Front Camera" stream={stream} />
         </Stack>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <Box sx={{ flex: 1 }}>

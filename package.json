@@ -16,9 +16,11 @@
     "amazon-kinesis-video-streams-webrtc": "^2.3.1",
     "aws-sdk": "^2.1691.0",
     "events": "^3.3.0",
+    "mockrtc": "^0.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@babel/core": "^7.14.5",

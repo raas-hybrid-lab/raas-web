@@ -9,12 +9,13 @@
  */
 
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { RTCBridgeBase } from './rtcBridgeBase';
+import { RTCSignalingBase } from './rtcSignalingBase';
 import { v4 as uuid } from 'uuid';
+import { RTCPeerWrapper } from './rtcPeerWrapper';
 
 
-export type RTCBridgeViewerCallbacks = {
-    onMasterConnected?: (peerConnection: RTCPeerConnection) => void,
+export type RTCSignalingViewerCallbacks = {
+    onMasterConnected?: (peerConnection: RTCPeerWrapper) => void,
     onSignalingDisconnect?: () => void,
     onSignalingError?: (error: Error | object) => void,
 }
@@ -36,20 +37,20 @@ type SignalingClientStatusResponse = {
     statusResponse: StatusResponseInner;
 };
 
-export class RTCBridgeViewer extends RTCBridgeBase {
+export class RTCSignalingViewer extends RTCSignalingBase {
     /**
      * Singleton class for managing the RTC connection with the lab client.
      */
 
-    private static singleton: RTCBridgeViewer | undefined;
-    private _callbacks: RTCBridgeViewerCallbacks
-    private peerConnection: RTCPeerConnection | undefined;
+    private static singleton: RTCSignalingViewer | undefined;
+    private _callbacks: RTCSignalingViewerCallbacks
+    private _peerConnection: RTCPeerWrapper | undefined;
 
     private constructor(
-        callbacks: RTCBridgeViewerCallbacks,
+        callbacks: RTCSignalingViewerCallbacks,
     ) {
         const channelName = import.meta.env['VITE_KINESIS_CHANNEL_NAME'];
-        const clientId = RTCBridgeViewer.generateClientId();
+        const clientId = RTCSignalingViewer.generateClientId();
 
         super(
             channelName,
@@ -58,12 +59,12 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             clientId
         );
         this._callbacks = callbacks;
-        this.peerConnection = undefined;
+        this._peerConnection = undefined;
     }
 
-    public static async getInstance(callbacks: RTCBridgeViewerCallbacks): Promise<RTCBridgeViewer> {
+    public static async getInstance(callbacks: RTCSignalingViewerCallbacks): Promise<RTCSignalingViewer> {
         if (!this.singleton) {
-            this.singleton = new RTCBridgeViewer(callbacks);
+            this.singleton = new RTCSignalingViewer(callbacks);
         }
         else {
             console.warn("RTCBridgeViewer singleton already exists. Returning existing instance & setting new callbacks.");
@@ -75,7 +76,11 @@ export class RTCBridgeViewer extends RTCBridgeBase {
     override cleanup(): void {
         super.cleanup();
         this._callbacks.onSignalingDisconnect?.();
-        RTCBridgeViewer.singleton = undefined;
+        RTCSignalingViewer.singleton = undefined;
+    }
+
+    get peerConnection(): RTCPeerWrapper | undefined {
+        return this._peerConnection;
     }
 
     protected override async _registerSignalingClientCallbacks(
@@ -87,42 +92,18 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             console.debug("Signaling client opened. We're connected to AWS. Making offer to lab client...");
 
             // create a peer connection and send an offer to the lab client.
-            this.peerConnection = new RTCPeerConnection(rtcConfig);
-            const offer = await this.peerConnection.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true,
-            });
-            await this.peerConnection.setLocalDescription(offer);
-            if (this.peerConnection.localDescription) {
-                console.debug('[VIEWER] Sending SDP offer with local description:', this.peerConnection.localDescription);
-                signalingClient.sendSdpOffer(this.peerConnection.localDescription);
-            }
-            else {
-                // unsure why this would happen, but typing indicates it's possible
-                throw new Error("No local description to send to lab client.");
-            }
-            console.debug('[VIEWER] Sent SDP offer to lab client. Generating ICE candidates...');
-
-            // set up some key callbacks for the peer connection, purely those having to do with ICE & signaling.
-            // callbacks having to do with tracks & media are handled elsewhere, i.e. by the robot manager.
-            this.peerConnection.addEventListener('icecandidate', ({ candidate }) => {
-                console.debug(`ICE candidate generated. Sending to lab client...`, candidate);
-                if (candidate) {
-                    signalingClient.sendIceCandidate(candidate);
-                } else {
-                    console.debug(`No more ICE candidates will be generated.`);
-                }
-            });
-
-            this.peerConnection.addEventListener('connectionstatechange', () => {
-                console.debug('[VIEWER] Peer connection state changed:', this.peerConnection?.connectionState);
-            });
-
+            this._peerConnection = new RTCPeerWrapper(new RTCPeerConnection(rtcConfig), this, undefined, true);
         });
 
+        const addIceCandidate = async (candidate: RTCIceCandidate) => {
+            await this._peerConnection?.addIceCandidate(candidate);
+        };
+
+        signalingClient.on('iceCandidate', addIceCandidate);
+
         signalingClient.on('sdpOffer', async (offer: RTCSessionDescription) => {
-            console.error("SDP Offer received...we shouldn't be getting this in the user client.", offer);
-            this._callbacks.onSignalingError?.(offer);
+            console.log("SDP Offer received--due to negotiation needed:", offer);
+            
         });
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
@@ -131,10 +112,11 @@ export class RTCBridgeViewer extends RTCBridgeBase {
             console.debug('SDP answer:', answer);
 
             // let our user handle the rest.
-            if (this.peerConnection) {
+            if (this._peerConnection) {
+                await this._peerConnection.setRemoteDescription(answer);
+                await this._peerConnection.awaitReadyToNegotiate();
                 console.log('[VIEWER] Connected to lab client!');
-                await this.peerConnection.setRemoteDescription(answer);
-                this._callbacks.onMasterConnected?.(this.peerConnection);
+                this._callbacks.onMasterConnected?.(this._peerConnection);
             }
             else {
                 console.error("No peer connection to send to user upon SDP Answer...this shouldn't happen.");
@@ -172,4 +154,4 @@ export class RTCBridgeViewer extends RTCBridgeBase {
 
 }
 
-export default RTCBridgeViewer;
+export default RTCSignalingViewer;

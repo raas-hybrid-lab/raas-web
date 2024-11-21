@@ -4,9 +4,9 @@ import { AWSClientArgs, loadAWSClientArgs } from './awsConfig';
 
 
 /**
- * Base class for RTCBridgeMaster and RTCBridgeViewer.
+ * Base class for RTCSignalingMaster and RTCSignalingViewer.
  */
-export abstract class RTCBridgeBase {
+export abstract class RTCSignalingBase {
     protected _channelHelper: ChannelHelper;
     protected readonly _clientConfig: AWSClientArgs;
     protected readonly _loggingPrefix: string;
@@ -56,6 +56,20 @@ export abstract class RTCBridgeBase {
      */
     protected generateCorrelationId(): string {
         return Date.now().toString();
+    }
+
+    public sendIceCandidate(candidate: RTCIceCandidate): void {
+        this._channelHelper.getSignalingClient()?.sendIceCandidate(candidate);
+    }
+
+    public sendSdpOffer(offer: RTCSessionDescription): void {
+        const client = this._channelHelper.getSignalingClient();
+        if (client) {
+            client.sendSdpOffer(offer);
+        }
+        else {
+            console.error("Signaling client not connected. Can't send SDP offer.");
+        }
     }
 
     /**
