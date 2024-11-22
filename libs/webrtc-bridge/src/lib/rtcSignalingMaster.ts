@@ -1,10 +1,10 @@
 /**
  * The RTCBridgeMaster is responsible for creating and managing the media streams for the RTC connection with the
  * user client.
- * 
+ *
  * These streams are roughly analogous to the WebRTC DataChannel and MediaStream, but they are specifically tailored
  * for the needs of this application.
- * 
+ *
  * Currently this class is built around AWS Kinesis Video Streams, but it could be adapted to other services in the future.
  */
 
@@ -98,11 +98,28 @@ export class RTCSignalingMaster extends RTCSignalingBase {
                     return;
                 }
 
+                console.debug(this._loggingPrefix, `Received ICE candidate from ${remoteClientId || 'remote'}`);
+                // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+
                 // Add the ICE candidate received from the client to the peer connection
                 peerConnection.addIceCandidate(candidate);
             };
 
             signalingClient.on('iceCandidate', addIceCandidate);
+
+            peerConnection.addEventListener('icecandidate', ({ candidate }) => {
+                // `candidate` will be the empty string if the event indicates that there are no further candidates
+                // to come in this generation, or null if all ICE gathering on all transports is complete.
+                // https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/icecandidate_event
+                if (candidate) {
+                    console.debug(this._loggingPrefix, 'Generated ICE candidate for', remoteClientId);
+                    // console.debug(this._loggingPrefix, 'ICE candidate:', candidate);
+
+                    signalingClient.sendIceCandidate(candidate, remoteClientId);
+                } else {
+                    console.debug(this._loggingPrefix, 'All ICE candidates have been generated for', remoteClientId);
+                }
+            });
 
             await peerConnection.setRemoteDescription(offer);
 
@@ -146,7 +163,7 @@ export class RTCSignalingMaster extends RTCSignalingBase {
 
         signalingClient.on('close', () => {
             // the signaling client has closed.
-            // this means that we're disconnected from AWS and can't receive new peer connections. 
+            // this means that we're disconnected from AWS and can't receive new peer connections.
             // TODO handle this by awaiting a new client connection
             // for now we'll just let the user handle it.
             console.error("Signaling client closed. We're disconnected from AWS.");
