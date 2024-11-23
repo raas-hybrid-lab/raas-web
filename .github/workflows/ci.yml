@@ -11,6 +11,9 @@ on:
         type: boolean
         description: "Deploy site to S3"
         default: false
+      projects:
+        type: string
+        description: "Projects to deploy, if deploying (just deploy affected by default) - space separated list"
 
 
 env:
@@ -74,5 +77,11 @@ jobs:
 
       - name: Deploy to S3
         if: (github.event_name == 'push' && github.event.ref == 'refs/heads/main') || inputs.deploy == true
-        run: npx nx affected -t deploy
+        run: |
+          INPUT_PROJECTS=${{ inputs.projects }}
+          if [ -n "$INPUT_PROJECTS" ]; then
+            npx nx deploy --projects $INPUT_PROJECTS
+          else
+            npx nx affected -t deploy
+          fi
 
