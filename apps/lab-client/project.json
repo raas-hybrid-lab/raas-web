@@ -5,5 +5,15 @@
   "projectType": "application",
   "tags": [],
   "// targets": "to see all targets run: nx show project lab-client --web",
-  "targets": {}
+  "targets": {
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nx build lab-client --prod && aws s3 sync dist/apps/lab-client s3://raas.static.lab-client",
+        "cwd": "",
+        "args": "",
+        "envVariables": []
+      }
+    }
+  }
 }

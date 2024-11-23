@@ -5,5 +5,15 @@
   "projectType": "application",
   "tags": [],
   "// targets": "to see all targets run: nx show project user-client --web",
-  "targets": {}
+  "targets": {
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nx build user-client --prod && aws s3 sync dist/apps/user-client s3://raas.static.user-client",
+        "cwd": "",
+        "args": "",
+        "envVariables": []
+      }
+    }
+  }
 }

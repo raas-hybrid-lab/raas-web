@@ -1,10 +1,16 @@
-name: CI
+name: Lint & Test
 
 on:
   push:
     branches:
       - main
   pull_request:
+
+env:
+  ACTIONS_IAM_ROLE: ${{ vars.ACTIONS_IAM_ROLE }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
 
 permissions:
   actions: read
@@ -49,3 +55,17 @@ jobs:
       # - run: npx nx-cloud record -- echo Hello World
       # Nx Affected runs only tasks affected by the changes in this PR/commit. Learn more: https://nx.dev/ci/features/affected
       - run: npx nx affected -t lint test build
+
+      # Deployment steps only need to run on push to main
+      
+      - uses: aws-actions/configure-aws-credentials@v4.0.2
+        if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+        with:
+          role-to-assume: ${{ env.ACTIONS_IAM_ROLE }}
+          role-session-name: deploy-raas # just a helpful name, doesn't matter to aws
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        if: github.event_name == 'push' && github.event.ref == 'refs/heads/main'
+        run: npx nx affected -t deploy
+
