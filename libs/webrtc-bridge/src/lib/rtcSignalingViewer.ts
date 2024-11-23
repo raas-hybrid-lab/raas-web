@@ -99,7 +99,6 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
         signalingClient.on('sdpOffer', async (offer: RTCSessionDescription) => {
             console.log("SDP Offer received--due to negotiation needed:", offer);
-
         });
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
