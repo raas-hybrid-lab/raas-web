@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - cicd-deploy
   workflow_dispatch:
     inputs: 
       projects:
@@ -26,6 +27,12 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
+      - uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          role-to-assume: ${{ env.ACTIONS_IAM_ROLE }}
+          role-session-name: deploy-raas # just a helpful name, doesn't matter to aws
+          aws-region: ${{ env.AWS_REGION }}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -38,14 +45,6 @@ jobs:
 
       - run: yarn install --frozen-lockfile
       - uses: nrwl/nx-set-shas@v4
-
-      # Deployment steps only need to run on push to main
-      
-      - uses: aws-actions/configure-aws-credentials@v4.0.2
-        with:
-          role-to-assume: ${{ env.ACTIONS_IAM_ROLE }}
-          role-session-name: deploy-raas # just a helpful name, doesn't matter to aws
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
         run: |
