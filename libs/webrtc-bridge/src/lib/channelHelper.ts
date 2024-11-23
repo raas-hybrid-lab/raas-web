@@ -1,6 +1,17 @@
 import * as KVSWebRTC from 'amazon-kinesis-video-streams-webrtc';
-import { KinesisVideo, KinesisVideoSignalingChannels, KinesisVideoWebRTCStorage } from 'aws-sdk';
+import { ChannelProtocol, DescribeMediaStorageConfigurationCommand, DescribeSignalingChannelCommand, GetSignalingChannelEndpointCommand, KinesisVideoClient } from '@aws-sdk/client-kinesis-video';
+import { GetIceServerConfigCommand, KinesisVideoSignalingClient } from '@aws-sdk/client-kinesis-video-signaling';
+import { KinesisVideoWebRTCStorageClient } from '@aws-sdk/client-kinesis-video-webrtc-storage';
 import { AWSClientArgs } from './awsConfig';
+
+type awsV3Config = {
+    region: string;
+    credentials: {
+        accessKeyId: string;
+        secretAccessKey: string;
+        sessionToken?: string;
+    };
+}
 
 class ChannelHelper {
     static IngestionMode = {
@@ -10,7 +21,7 @@ class ChannelHelper {
     };
 
     private _channelName: string;
-    private _clientArgs: AWSClientArgs;
+    private _v3ClientArgs: awsV3Config;
     private _role: KVSWebRTC.Role;
     private _endpoint: string | null;
     private _ingestionMode: number;
@@ -18,16 +29,15 @@ class ChannelHelper {
     private _clientId: string | undefined;
     private _channelArn?: string;
     private _endpoints?: Record<string, string>;
-    private _kinesisVideoClient?: KinesisVideo;
-    private _signalingChannelsClient?: KinesisVideoSignalingChannels;
+    private _kinesisVideoClient?: KinesisVideoClient;
+    private _signalingChannelsClient?: KinesisVideoSignalingClient;
     private _signalingClient?: KVSWebRTC.SignalingClient;
-    private _webrtcStorageClient?: KinesisVideoWebRTCStorage;
+    private _webrtcStorageClient?: KinesisVideoWebRTCStorageClient;
     private _streamArn?: string;
     private _signalingConnectionStarted?: Date;
 
     constructor(channelName: string, clientArgs: AWSClientArgs, endpoint: string | null, role: KVSWebRTC.Role, ingestionMode: number, loggingPrefix: string, clientId: string | undefined) {
         this._channelName = channelName;
-        this._clientArgs = clientArgs;
         this._role = role;
         this._endpoint = endpoint;
         this._ingestionMode = ingestionMode;
@@ -35,17 +45,30 @@ class ChannelHelper {
         this._clientId = clientId;
 
         // Validate required client arguments 
-        if (!this._clientArgs.region) {
-            throw new Error('Region is required');
+        try {
+            if (!clientArgs.region) {
+                throw new Error('Region is required');
+            }
+            if (!clientArgs.accessKeyId) {
+                throw new Error('Access key ID is required');
+            }
+            if (!clientArgs.secretAccessKey) {
+                throw new Error('Secret access key is required');
+            }
+        } catch (error) {
+            console.error('Error in channelHelper constructor:', error);
+            throw error;
         }
-        if (!this._clientArgs.accessKeyId) {
-            throw new Error('Access key ID is required');
+        // Convert client args to aws sdk v3-style config
+        this._v3ClientArgs = {
+            region: clientArgs.region,
+            credentials: {
+                accessKeyId: clientArgs.accessKeyId,
+                secretAccessKey: clientArgs.secretAccessKey,
+            },
         }
-        if (!this._clientArgs.sessionToken) {
-            throw new Error('Secret access key is required');
-        }
-        if (!this._clientArgs.secretAccessKey) {
-            throw new Error('Secret access key is required');
+        if (clientArgs.sessionToken) {
+            this._v3ClientArgs.credentials.sessionToken = clientArgs.sessionToken;
         }
     }
 
@@ -64,7 +87,7 @@ class ChannelHelper {
         return this._channelArn;
     }
 
-    getKinesisVideoClient(): KinesisVideo {
+    getKinesisVideoClient(): KinesisVideoClient {
         if (!this._kinesisVideoClient) {
             throw new Error('Kinesis Video client is not initialized- did you forget to call init()?');
         }
@@ -82,7 +105,7 @@ class ChannelHelper {
         return this._ingestionMode === ChannelHelper.IngestionMode.ON;
     }
 
-    getWebRTCStorageClient(): KinesisVideoWebRTCStorage {
+    getWebRTCStorageClient(): KinesisVideoWebRTCStorageClient {
         if (!this._webrtcStorageClient) {
             throw new Error('WebRTC storage client is not initialized- did you forget to call init()?');
         }
@@ -100,7 +123,11 @@ class ChannelHelper {
         if (!this._channelArn) {
             throw new Error('Channel ARN is required to fetch TURN servers.');
         }
-        const response = await this._signalingChannelsClient?.getIceServerConfig({ ChannelARN: this._channelArn }).promise();
+        const command = new GetIceServerConfigCommand({
+            ChannelARN: this._channelArn,
+            Service: "TURN",
+        })
+        const response = await this._signalingChannelsClient?.send(command);
         if (!response?.IceServerList) {
             return [];
         }
@@ -129,37 +156,28 @@ class ChannelHelper {
             await this._checkWebRTCIngestionPath();
         }
 
-        const protocols: string[] = ['HTTPS', 'WSS'];
+        const protocols: ChannelProtocol[] = ['HTTPS', 'WSS'];
         if (this._ingestionMode === ChannelHelper.IngestionMode.ON) {
             protocols.push('WEBRTC');
         }
 
         this._endpoints = await this._getSignalingChannelEndpoints(this.getKinesisVideoClient(), this.getChannelArn(), this._role, protocols);
 
-        this._signalingChannelsClient = new KinesisVideoSignalingChannels({
-            ...this._clientArgs,
+        this._signalingChannelsClient = new KinesisVideoSignalingClient({
+            ...this._v3ClientArgs,
             endpoint: this._endpoints['HTTPS'],
-            correctClockSkew: true,
         });
 
         this._signalingClient = new KVSWebRTC.SignalingClient({
             channelARN: this.getChannelArn(),
             channelEndpoint: this._endpoints['WSS'],
             role: this._role,
-            region: this._clientArgs.region,
-            credentials: {
-                accessKeyId: this._clientArgs.accessKeyId,
-                secretAccessKey: this._clientArgs.secretAccessKey,
-                sessionToken: this._clientArgs.sessionToken,
-            },
+            region: this._v3ClientArgs.region,
+            credentials: this._v3ClientArgs.credentials,
             clientId: this._clientId,
             requestSigner: {
                 getSignedURL: async (signalingEndpoint: string, queryParams: KVSWebRTC.QueryParams, date: Date | undefined) => {
-                    const signer = new KVSWebRTC.SigV4RequestSigner(this._clientArgs.region, {
-                        accessKeyId: this._clientArgs.accessKeyId,
-                        secretAccessKey: this._clientArgs.secretAccessKey,
-                        sessionToken: this._clientArgs.sessionToken,
-                    });
+                    const signer = new KVSWebRTC.SigV4RequestSigner(this._v3ClientArgs.region, this._v3ClientArgs.credentials);
 
                     const signingStart = new Date();
                     console.debug(this._loggingPrefix, 'Signing the url started at', signingStart);
@@ -181,8 +199,8 @@ class ChannelHelper {
         });
 
         if (this._ingestionMode === ChannelHelper.IngestionMode.ON) {
-            this._webrtcStorageClient = new KinesisVideoWebRTCStorage({
-                ...this._clientArgs,
+            this._webrtcStorageClient = new KinesisVideoWebRTCStorageClient({
+                ...this._v3ClientArgs,
                 endpoint: this._endpoints['WEBRTC'],
             });
         }
@@ -190,22 +208,18 @@ class ChannelHelper {
 
     private async _checkWebRTCIngestionPath(): Promise<void> {
         if (!this._kinesisVideoClient) {
+            console.log(this._loggingPrefix, 'Creating Kinesis Video client...');
+            console.log(this._loggingPrefix, 'Client args:', this._v3ClientArgs);
 
-            this._kinesisVideoClient = new KinesisVideo({
-                ...this._clientArgs,
-                // @ts-expect-error this can actually be null (as in the example code in the sdk repo), it's just not documented
-                endpoint: this._endpoint,
-                correctClockSkew: true,
-            });
+            this._kinesisVideoClient = new KinesisVideoClient(this._v3ClientArgs);
         }
 
         if (!this._channelArn) {
             console.log(`[MASTER]`, 'Channel name:', this._channelName);
             const describeSignalingChannelResponse = await this._kinesisVideoClient
-                .describeSignalingChannel({
+                .send(new DescribeSignalingChannelCommand({
                     ChannelName: this._channelName,
-                })
-                .promise();
+                }));
 
             this._channelArn = describeSignalingChannelResponse.ChannelInfo?.ChannelARN;
             console.log(this._loggingPrefix, 'Channel ARN:', this._channelArn);
@@ -213,10 +227,9 @@ class ChannelHelper {
 
         if (this._ingestionMode === ChannelHelper.IngestionMode.DETERMINE_THROUGH_DESCRIBE) {
             const describeMediaStorageConfigurationResponse = await this._kinesisVideoClient
-                .describeMediaStorageConfiguration({
+                .send(new DescribeMediaStorageConfigurationCommand({
                     ChannelARN: this.getChannelArn(),
-                })
-                .promise();
+                }));
             const mediaStorageConfiguration = describeMediaStorageConfigurationResponse.MediaStorageConfiguration;
             console.log(this._loggingPrefix, 'Media storage configuration:', mediaStorageConfiguration);
             if (mediaStorageConfiguration?.Status === 'ENABLED' && mediaStorageConfiguration?.StreamARN !== null) {
@@ -228,16 +241,17 @@ class ChannelHelper {
         }
     }
 
-    private async _getSignalingChannelEndpoints(kinesisVideoClient: KinesisVideo, arn: string, role: string, protocols: string[]): Promise<Record<string, string>> {
-        const getSignalingChannelEndpointResponse = await kinesisVideoClient
-            .getSignalingChannelEndpoint({
+    private async _getSignalingChannelEndpoints(kinesisVideoClient: KinesisVideoClient, arn: string, role: KVSWebRTC.Role, protocols: ChannelProtocol[]): Promise<Record<string, string>> {
+        const command = new GetSignalingChannelEndpointCommand(
+            {
                 ChannelARN: arn,
                 SingleMasterChannelEndpointConfiguration: {
                     Protocols: protocols,
                     Role: role,
                 },
-            })
-            .promise();
+            }
+        );
+        const getSignalingChannelEndpointResponse = await kinesisVideoClient.send(command);
         if (!getSignalingChannelEndpointResponse.ResourceEndpointList) {
             throw new Error('No resource endpoint list found in get signaling channel endpoint response');
         }

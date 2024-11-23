@@ -21,12 +21,13 @@ export default defineConfig({
   //  plugins: [ nxViteTsPaths() ],
   // },
   build: {
-    outDir: '../../dist/apps/lab-client',
+    outDir: '../../dist/apps/user-client',
     emptyOutDir: true,
     reportCompressedSize: true,
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+    sourcemap: true,
   },
   define: {
     // had to add this to make the kinesis webrtc sdk work with vite.

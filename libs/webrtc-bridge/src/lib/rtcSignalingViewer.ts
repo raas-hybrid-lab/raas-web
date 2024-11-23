@@ -1,10 +1,10 @@
 /**
  * The RTCBridgeMaster is responsible for creating and managing the media streams for the RTC connection with the
  * user client.
- * 
+ *
  * These streams are roughly analogous to the WebRTC DataChannel and MediaStream, but they are specifically tailored
  * for the needs of this application.
- * 
+ *
  * Currently this class is built around AWS Kinesis Video Streams, but it could be adapted to other services in the future.
  */
 
@@ -88,22 +88,17 @@ export class RTCSignalingViewer extends RTCSignalingBase {
         rtcConfig: RTCConfiguration,
     ): Promise<void> {
 
+        const peerConnection = new RTCPeerConnection(rtcConfig);
+
         signalingClient.on('open', async () => {
             console.debug("Signaling client opened. We're connected to AWS. Making offer to lab client...");
 
             // create a peer connection and send an offer to the lab client.
-            this._peerConnection = new RTCPeerWrapper(new RTCPeerConnection(rtcConfig), this, undefined, true);
+            this._peerConnection = new RTCPeerWrapper(peerConnection, this, undefined, true);
         });
-
-        const addIceCandidate = async (candidate: RTCIceCandidate) => {
-            await this._peerConnection?.addIceCandidate(candidate);
-        };
-
-        signalingClient.on('iceCandidate', addIceCandidate);
 
         signalingClient.on('sdpOffer', async (offer: RTCSessionDescription) => {
             console.log("SDP Offer received--due to negotiation needed:", offer);
-            
         });
 
         signalingClient.on('sdpAnswer', async (answer: RTCSessionDescription) => {
@@ -125,7 +120,7 @@ export class RTCSignalingViewer extends RTCSignalingBase {
 
         signalingClient.on('close', () => {
             // the signaling client has closed.
-            // this means that we're disconnected from AWS and can't receive new peer connections. 
+            // this means that we're disconnected from AWS and can't receive new peer connections.
             // TODO handle this by awaiting a new client connection
             // for now we'll just let the user handle it.
             console.error("Signaling client closed. We're disconnected from AWS.");
@@ -144,6 +139,11 @@ export class RTCSignalingViewer extends RTCSignalingBase {
             console.debug("Signaling client status response...", status);
             this._callbacks.onSignalingError?.(status);
         })
+
+        signalingClient.on('iceCandidate', (candidate: RTCIceCandidate) => {
+            console.debug("[VIEWER] Received ICE candidate...", candidate);
+            peerConnection.addIceCandidate(candidate);
+        });
 
     }
 
