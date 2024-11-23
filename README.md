@@ -1,4 +1,4 @@
-# RaasWeb
+# Raas Web Monorepo
 
 RaaS is a remote-access system for robots, enabling users to rent time on robot systems, control them,
 view telemetry, and more, without being physically present, using a web-based interface.
@@ -31,6 +31,7 @@ Aside from that, the UI is built with [React](https://react.dev/), and all clien
 Both clients can be run locally. You'll need to do the following first:
 
 - install node [using nvm](https://nodejs.org/en/download/package-manager)
+- switch to the correct node version by running `nvm use` at the root of this repo; if that version isn't installed, install it with `nvm install`
 - install yarn with `npm install -g yarn`
 - run `yarn` in the root to install dependencies
 - add `.env` files to the `lab-client` and `user-client` directories, using the `.env.example` files as templates.
