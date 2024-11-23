@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs: 
+      projects:
+        type: string
+        description: "Projects to deploy, if deploying (just deploy affected by default) - space separated list"
+
+
+env:
+  ACTIONS_IAM_ROLE: ${{ vars.ACTIONS_IAM_ROLE }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Cache node_modules
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: yarn install --frozen-lockfile
+      - uses: nrwl/nx-set-shas@v4
+
+      # Deployment steps only need to run on push to main
+      
+      - uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          role-to-assume: ${{ env.ACTIONS_IAM_ROLE }}
+          role-session-name: deploy-raas # just a helpful name, doesn't matter to aws
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: |
+          INPUT_PROJECTS=${{ inputs.projects }}
+          if [ -n "$INPUT_PROJECTS" ]; then
+            npx nx deploy --projects $INPUT_PROJECTS
+          else
+            npx nx affected -t deploy
+          fi
+
