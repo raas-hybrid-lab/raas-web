@@ -1,6 +1,12 @@
 # RaasWeb
 
-This is a monorepo for the RaaS project web peers, which includes the lab client, user client, and shared libraries.
+RaaS is a remote-access system for robots, enabling users to rent time on robot systems, control them,
+view telemetry, and more, without being physically present, using a web-based interface.
+
+This is a monorepo for the RaaS project web clients, which includes the lab client, user client, and shared libraries.
+
+These clients use [WebRTC](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API) for communication, a peer-to-peer protocol in which, after an initial negotiation assisted
+by a remote server, peers connect to each other directly and exchange securely encrypted streams of media (audio, video, etc.) and data.
 
 ## Contents
 
